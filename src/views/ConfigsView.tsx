@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { useToast } from '../contexts/ToastContext'
 import { parseProfileLink, parseJSONProfile, generateProfileLink, generateV2RayJSON } from '../utils/profile-parser'
+import { exportProfilesAsFile } from '../utils/export'
 import { pingServer } from '../utils/ping'
 import { ProfileEditor } from '../components/ProfileEditor'
 import { QRScannerModal } from '../components/QRScannerModal'
@@ -195,57 +196,72 @@ export const ConfigsView = () => {
                         </div>
                     </div>
 
-                    {/* Import Button */}
-                    <div className="relative">
+                    {/* Export & Import Buttons */}
+                    <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setShowImportMenu(!showImportMenu)}
-                            disabled={importing}
-                            className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-lg font-medium text-sm transition-all shadow-lg hover-lift disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => {
+                                exportProfilesAsFile(profiles)
+                                showToast('Profiles exported successfully', 'success')
+                            }}
+                            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg text-sm font-medium transition-all border border-zinc-700"
+                            title="Export all profiles to JSON file"
                         >
-                            <Plus size={18} className={importing ? 'animate-spin' : ''} />
-                            {importing ? 'Importing...' : 'Import Config'}
+                            <FileJson size={16} className="inline mr-2" />
+                            Export All
                         </button>
 
-                        {/* Import Dropdown */}
-                        {showImportMenu && (
-                            <div className="absolute right-0 mt-2 w-64 bg-surface border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-scale-in">
-                                <button
-                                    onClick={handleImportFromClipboard}
-                                    className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left"
-                                >
-                                    <Clipboard size={18} className="text-accent" />
-                                    <div>
-                                        <div className="font-medium text-sm text-primary">Import URI from Clipboard</div>
-                                        <div className="text-xs text-secondary">vless:// or vmess://</div>
-                                    </div>
-                                </button>
+                        {/* Import Button */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowImportMenu(!showImportMenu)}
+                                disabled={importing}
+                                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-lg font-medium text-sm transition-all shadow-lg hover-lift disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Plus size={18} className={importing ? 'animate-spin' : ''} />
+                                {importing ? 'Importing...' : 'Import Config'}
+                            </button>
 
-                                <button
-                                    onClick={handleImportJSONFromClipboard}
-                                    className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left border-t border-border"
-                                >
-                                    <FileJson size={18} className="text-emerald-500" />
-                                    <div>
-                                        <div className="font-medium text-sm text-primary">Import JSON from Clipboard</div>
-                                        <div className="text-xs text-secondary">Xray JSON config</div>
-                                    </div>
-                                </button>
+                            {/* Import Dropdown */}
+                            {showImportMenu && (
+                                <div className="absolute right-0 mt-2 w-64 bg-surface border border-border rounded-lg shadow-xl z-50 overflow-hidden animate-scale-in">
+                                    <button
+                                        onClick={handleImportFromClipboard}
+                                        className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left"
+                                    >
+                                        <Clipboard size={18} className="text-accent" />
+                                        <div>
+                                            <div className="font-medium text-sm text-primary">Import URI from Clipboard</div>
+                                            <div className="text-xs text-secondary">vless:// or vmess://</div>
+                                        </div>
+                                    </button>
 
-                                <button
-                                    onClick={() => {
-                                        setShowQRScanner(true)
-                                        setShowImportMenu(false)
-                                    }}
-                                    className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left border-t border-border"
-                                >
-                                    <Link2 size={18} className="text-blue-500" />
-                                    <div>
-                                        <div className="font-medium text-sm text-primary">Scan QR Code</div>
-                                        <div className="text-xs text-secondary">From screen or camera</div>
-                                    </div>
-                                </button>
-                            </div>
-                        )}
+                                    <button
+                                        onClick={handleImportJSONFromClipboard}
+                                        className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left border-t border-border"
+                                    >
+                                        <FileJson size={18} className="text-emerald-500" />
+                                        <div>
+                                            <div className="font-medium text-sm text-primary">Import JSON from Clipboard</div>
+                                            <div className="text-xs text-secondary">Xray JSON config</div>
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        onClick={() => {
+                                            setShowQRScanner(true)
+                                            setShowImportMenu(false)
+                                        }}
+                                        className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left border-t border-border"
+                                    >
+                                        <Link2 size={18} className="text-blue-500" />
+                                        <div>
+                                            <div className="font-medium text-sm text-primary">Scan QR Code</div>
+                                            <div className="text-xs text-secondary">From screen or camera</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
