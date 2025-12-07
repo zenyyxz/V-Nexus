@@ -426,7 +426,7 @@ export const SettingsView = () => {
                                 {/* Advanced Mode Only: Max Log Lines */}
                                 {settings.mode === 'advanced' && (
                                     <div className="pt-4 border-t border-border">
-                                        <label className="block text-xs font-medium text-secondary mb-2">Maximum Log Lines</label>
+                                        <label className="block text-xs font-medium text-secondary mb-2">{t('settings_log_lines')}</label>
                                         <input
                                             type="number"
                                             min="100"
@@ -436,7 +436,7 @@ export const SettingsView = () => {
                                             className="w-32 bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
                                         />
                                         <p className="text-xs text-secondary mt-1.5">
-                                            Maximum number of log lines to keep in memory
+                                            {t('settings_log_lines_desc')}
                                         </p>
                                     </div>
                                 )}
@@ -448,14 +448,14 @@ export const SettingsView = () => {
                                         onChange={(e) => updateSettings({ autoConnect: e.target.value as any })}
                                         className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
                                     >
-                                        <option value="none">None</option>
-                                        <option value="last">Last Connected</option>
-                                        <option value="fixed">Fixed Server</option>
+                                        <option value="none">{t('settings_none')}</option>
+                                        <option value="last">{t('settings_auto_last')}</option>
+                                        <option value="fixed">{t('settings_auto_fixed')}</option>
                                     </select>
                                     <p className="text-xs text-secondary mt-1.5">
-                                        {settings.autoConnect === 'none' && 'Do not auto-connect on startup'}
-                                        {settings.autoConnect === 'last' && 'Connect to last used server on startup'}
-                                        {settings.autoConnect === 'fixed' && 'Connect to a specific server on startup'}
+                                        {settings.autoConnect === 'none' && t('settings_auto_none_desc')}
+                                        {settings.autoConnect === 'last' && t('settings_auto_last_desc')}
+                                        {settings.autoConnect === 'fixed' && t('settings_auto_fixed_desc')}
                                     </p>
                                 </div>
 
