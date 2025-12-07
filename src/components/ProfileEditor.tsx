@@ -11,6 +11,7 @@ interface ProfileEditorProps {
 export const ProfileEditor = ({ profile, onSave, onClose }: ProfileEditorProps) => {
     const [formData, setFormData] = useState({
         name: profile.name,
+        group: profile.group || '',
         address: profile.address,
         port: profile.port,
         protocol: profile.protocol,
