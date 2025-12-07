@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from '../contexts/AppContext'
 import { useToast } from '../contexts/ToastContext'
 import { parseProfileLink, parseJSONProfile, generateProfileLink, generateV2RayJSON } from '../utils/profile-parser'
@@ -10,6 +10,7 @@ import { QRCodeModal } from '../components/QRCodeModal'
 import { LockShareModal } from '../components/LockShareModal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { JSONEditorModal } from '../components/JSONEditorModal'
+import { ProfileCardSkeleton } from '../components/ProfileCardSkeleton'
 import { CodeSlashIcon } from '../components/icons/CodeSlashIcon'
 import { FileCode, Plus, Clipboard, FileJson, Link2, Trash2, Edit, Zap, Share2, QrCode, Copy, Activity, TrendingUp, Server, Lock, Star } from 'lucide-react'
 
@@ -42,6 +43,13 @@ export const ConfigsView = () => {
     const [lockShareProfile, setLockShareProfile] = useState<any | null>(null)
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
     const [importing, setImporting] = useState(false)
+    const [isLoading, setIsLoading] = useState(true)
+
+    // Simulate loading on mount for professional feel
+    useEffect(() => {
+        const timer = setTimeout(() => setIsLoading(false), 800)
+        return () => clearTimeout(timer)
+    }, [])
 
     const handleImportFromClipboard = async () => {
         try {
