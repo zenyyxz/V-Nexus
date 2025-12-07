@@ -281,7 +281,7 @@ export const ConfigsView = () => {
                         <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-lg p-3 hover:border-blue-500/40 transition-all">
                             <div className="flex items-center gap-2 mb-1">
                                 <Server size={16} className="text-blue-400" />
-                                <span className="text-xs font-medium text-blue-300">Total Configs</span>
+                                <span className="text-xs font-medium text-blue-300">{t('configs_stat_total')}</span>
                             </div>
                             <div className="text-2xl font-bold text-primary">{stats.total}</div>
                         </div>
@@ -289,7 +289,7 @@ export const ConfigsView = () => {
                         <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 rounded-lg p-3 hover:border-emerald-500/40 transition-all">
                             <div className="flex items-center gap-2 mb-1">
                                 <TrendingUp size={16} className="text-emerald-400" />
-                                <span className="text-xs font-medium text-emerald-300">Avg Latency</span>
+                                <span className="text-xs font-medium text-emerald-300">{t('configs_stat_latency')}</span>
                             </div>
                             <div className="text-2xl font-bold text-primary">
                                 {stats.avgLatency > 0 ? `${stats.avgLatency}ms` : '—'}
@@ -299,7 +299,7 @@ export const ConfigsView = () => {
                         <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 rounded-lg p-3 hover:border-purple-500/40 transition-all">
                             <div className="flex items-center gap-2 mb-1">
                                 <Activity size={16} className="text-purple-400" />
-                                <span className="text-xs font-medium text-purple-300">Tested</span>
+                                <span className="text-xs font-medium text-purple-300">{t('configs_stat_tested')}</span>
                             </div>
                             <div className="text-2xl font-bold text-primary">
                                 {stats.tested}/{stats.total}
@@ -313,14 +313,14 @@ export const ConfigsView = () => {
                 {/* Configs List */}
                 <div className="bg-surface border border-border rounded-lg overflow-hidden h-full flex flex-col w-full mr-0">
                     <div className="p-4 bg-background/50 flex items-center justify-between border-b border-border">
-                        <h3 className="text-sm font-semibold text-primary">All Configurations ({profiles.length})</h3>
+                        <h3 className="text-sm font-semibold text-primary">{t('configs_all_title')} ({profiles.length})</h3>
                         <button
                             onClick={handlePingAll}
                             disabled={pingingAll || profiles.length === 0}
                             className="px-3 py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 rounded text-xs font-medium border border-yellow-500/30 transition-all hover-lift disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                             <Zap size={14} className={pingingAll ? 'animate-spin' : ''} />
-                            {pingingAll ? 'Pinging...' : 'Ping All'}
+                            {pingingAll ? t('configs_pinging') : t('configs_ping_all')}
                         </button>
                     </div>
 
@@ -336,8 +336,8 @@ export const ConfigsView = () => {
                                 <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-full p-6 mb-4">
                                     <FileCode size={48} className="text-accent" />
                                 </div>
-                                <h3 className="text-lg font-semibold text-primary mb-2">No Configurations Yet</h3>
-                                <p className="text-sm text-secondary mb-6 max-w-sm">Import your first server configuration to get started with secure browsing</p>
+                                <h3 className="text-lg font-semibold text-primary mb-2">{t('configs_no_configs')}</h3>
+                                <p className="text-sm text-secondary mb-6 max-w-sm">{t('configs_no_configs_desc')}</p>
                                 <button
                                     onClick={() => setShowImportMenu(true)}
                                     className="px-6 py-2.5 bg-accent hover:bg-accent/80 text-white rounded-lg text-sm font-medium transition-all shadow-lg hover-lift"

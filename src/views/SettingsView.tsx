@@ -248,7 +248,8 @@ export const SettingsView = () => {
                                 : 'text-secondary hover:text-primary'
                                 }`}
                         >
-                            Simple
+                        >
+                            {t('settings_simple')}
                         </button>
                         <button
                             onClick={() => updateSettings({ mode: 'advanced' })}
@@ -257,7 +258,7 @@ export const SettingsView = () => {
                                 : 'text-secondary hover:text-primary'
                                 }`}
                         >
-                            Advanced
+                            {t('settings_advanced')}
                         </button>
                     </div>
                 </div>
@@ -266,8 +267,8 @@ export const SettingsView = () => {
                 <div className="bg-accent/10 border border-accent/20 rounded-lg p-3">
                     <p className="text-sm text-accent">
                         {settings.mode === 'simple'
-                            ? '📱 Simple Mode - Essential settings for everyday use'
-                            : '⚙️ Advanced Mode - Full control with all technical options'}
+                            ? t('settings_mode_simple_desc')
+                            : t('settings_mode_advanced_desc')}
                     </p>
                 </div>
             </header>
@@ -381,8 +382,8 @@ export const SettingsView = () => {
 
                             <div className="space-y-4">
                                 <ToggleRow
-                                    label="Launch on Startup"
-                                    description="Automatically start V-Nexus when Windows starts"
+                                    label={t('settings_launch_startup')}
+                                    description={t('settings_launch_startup_desc')}
                                     checked={settings.launchOnStartup}
                                     onChange={async (checked) => {
                                         updateSettings({ launchOnStartup: checked })
@@ -396,29 +397,29 @@ export const SettingsView = () => {
                                 />
 
                                 <ToggleRow
-                                    label="Connect on Boot"
-                                    description="Automatically connect to last server when app starts"
+                                    label={t('settings_connect_boot')}
+                                    description={t('settings_connect_boot_desc')}
                                     checked={settings.connectOnBoot}
                                     onChange={(checked) => updateSettings({ connectOnBoot: checked })}
                                 />
 
                                 <ToggleRow
-                                    label="Reconnect on Failure"
-                                    description="Automatically reconnect if connection drops"
+                                    label={t('settings_reconnect')}
+                                    description={t('settings_reconnect_desc')}
                                     checked={settings.reconnectOnFailure}
                                     onChange={(checked) => updateSettings({ reconnectOnFailure: checked })}
                                 />
 
                                 <ToggleRow
-                                    label="Kill Switch"
-                                    description="Block internet if VPN disconnects unexpectedly"
+                                    label={t('settings_kill_switch')}
+                                    description={t('settings_kill_switch_desc')}
                                     checked={settings.killSwitch}
                                     onChange={(checked) => updateSettings({ killSwitch: checked })}
                                 />
 
                                 <ToggleRow
-                                    label="Connection Health Check"
-                                    description="Periodically ping server to verify connection (every 30s)"
+                                    label={t('settings_health_check')}
+                                    description={t('settings_health_check_desc')}
                                     checked={settings.connectionHealthCheck}
                                     onChange={(checked) => updateSettings({ connectionHealthCheck: checked })}
                                 />
@@ -442,7 +443,7 @@ export const SettingsView = () => {
                                 )}
 
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">Auto Connect</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('settings_auto_connect')}</label>
                                     <select
                                         value={settings.autoConnect || 'none'}
                                         onChange={(e) => updateSettings({ autoConnect: e.target.value as any })}
