@@ -460,7 +460,7 @@ export const SettingsView = () => {
                                 </div>
 
                                 <div className="pt-4 border-t border-border">
-                                    <label className="block text-xs font-medium text-secondary mb-2">Theme</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('settings_theme')}</label>
                                     <select
                                         value={settings.theme}
                                         onChange={(e) => updateSettings({ theme: e.target.value as 'dark' | 'light' })}
@@ -470,21 +470,21 @@ export const SettingsView = () => {
                                         <option value="light">Light</option>
                                     </select>
                                     <p className="text-xs text-secondary mt-1.5">
-                                        Choose between dark and light theme for the application interface
+                                        {t('settings_theme_desc')}
                                     </p>
                                 </div>
 
                                 <div className="pt-4 border-t border-border">
                                     <ToggleRow
-                                        label="Show Logs"
-                                        description="Display application logs in the Logs tab"
+                                        label={t('settings_show_logs')}
+                                        description={t('settings_show_logs_desc')}
                                         checked={settings.showLogs}
                                         onChange={(checked) => updateSettings({ showLogs: checked })}
                                     />
 
                                     <ToggleRow
-                                        label="Allow Insecure"
-                                        description="Allow insecure TLS connections"
+                                        label={t('settings_allow_insecure')}
+                                        description={t('settings_allow_insecure_desc')}
                                         checked={settings.allowInsecure}
                                         onChange={(checked) => updateSettings({ allowInsecure: checked })}
                                     />
@@ -508,18 +508,18 @@ export const SettingsView = () => {
                                 {/* Advanced Mode Only: DNS Query Strategy */}
                                 {settings.mode === 'advanced' && (
                                     <div>
-                                        <label className="block text-xs font-medium text-secondary mb-2">Query Strategy</label>
+                                        <label className="block text-xs font-medium text-secondary mb-2">{t('net_dns_query_strategy')}</label>
                                         <select
                                             value={settings.dnsQueryStrategy}
                                             onChange={(e) => updateSettings({ dnsQueryStrategy: e.target.value as any })}
                                             className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
                                         >
-                                            <option value="UseIP">UseIP (Query both A and AAAA)</option>
-                                            <option value="UseIPv4">UseIPv4 (Query A records only)</option>
-                                            <option value="UseIPv6">UseIPv6 (Query AAAA records only)</option>
+                                            <option value="UseIP">UseIP</option>
+                                            <option value="UseIPv4">UseIPv4</option>
+                                            <option value="UseIPv6">UseIPv6</option>
                                         </select>
                                         <p className="text-xs text-secondary mt-1.5">
-                                            Controls which IP version to use for DNS queries. UseIP queries both IPv4 and IPv6.
+                                            {t('net_dns_query_strategy_desc')}
                                         </p>
                                     </div>
                                 )}
@@ -528,8 +528,8 @@ export const SettingsView = () => {
                                 {/* Advanced Mode Only: DNS Log */}
                                 {settings.mode === 'advanced' && (
                                     <ToggleRow
-                                        label="DNS Log"
-                                        description="Enable DNS query logging"
+                                        label={t('net_dns_log')}
+                                        description={t('net_dns_log_desc')}
                                         checked={settings.dnsLog}
                                         onChange={(checked) => updateSettings({ dnsLog: checked })}
                                     />
@@ -539,8 +539,8 @@ export const SettingsView = () => {
                                 {/* Advanced Mode Only: Disable Cache */}
                                 {settings.mode === 'advanced' && (
                                     <ToggleRow
-                                        label="Disable Cache"
-                                        description="Disable DNS caching"
+                                        label={t('net_dns_disable_cache')}
+                                        description={t('net_dns_disable_cache_desc')}
                                         checked={settings.dnsDisableCache}
                                         onChange={(checked) => updateSettings({ dnsDisableCache: checked })}
                                     />
@@ -550,8 +550,8 @@ export const SettingsView = () => {
                                 {/* Advanced Mode Only: Disable Fallback */}
                                 {settings.mode === 'advanced' && (
                                     <ToggleRow
-                                        label="Disable Fallback"
-                                        description="Disable fallback to system DNS"
+                                        label={t('net_dns_disable_fallback')}
+                                        description={t('net_dns_disable_fallback_desc')}
                                         checked={settings.dnsDisableFallback}
                                         onChange={(checked) => updateSettings({ dnsDisableFallback: checked })}
                                     />
@@ -561,8 +561,8 @@ export const SettingsView = () => {
                                 {/* Advanced Mode Only: Disable Fallback If Match */}
                                 {settings.mode === 'advanced' && (
                                     <ToggleRow
-                                        label="Disable Fallback If Match"
-                                        description="Disable fallback when domain matches routing rules"
+                                        label={t('net_dns_disable_fallback_match')}
+                                        description={t('net_dns_disable_fallback_match_desc')}
                                         checked={settings.dnsDisableFallbackIfMatch}
                                         onChange={(checked) => updateSettings({ dnsDisableFallbackIfMatch: checked })}
                                     />
@@ -570,15 +570,15 @@ export const SettingsView = () => {
 
                                 <div className="pt-4 border-t border-border space-y-4">
                                     <ToggleRow
-                                        label="DNS Leak Protection"
-                                        description="Ensure all DNS queries go through the proxy"
+                                        label={t('net_dns_leak')}
+                                        description={t('net_dns_leak_desc')}
                                         checked={settings.dnsLeakProtection}
                                         onChange={(checked) => updateSettings({ dnsLeakProtection: checked })}
                                     />
 
                                     <ToggleRow
-                                        label="WebRTC Leak Protection"
-                                        description="Prevent IP leaks via WebRTC"
+                                        label={t('net_webrtc_leak')}
+                                        description={t('net_webrtc_leak_desc')}
                                         checked={settings.webrtcLeakProtection}
                                         onChange={(checked) => updateSettings({ webrtcLeakProtection: checked })}
                                     />
@@ -589,13 +589,13 @@ export const SettingsView = () => {
                                 {settings.mode === 'advanced' && (
                                     <div className="pt-4 border-t border-border">
                                         <div className="flex items-center justify-between mb-3">
-                                            <label className="text-xs font-medium text-secondary uppercase tracking-wider">DNS Servers</label>
+                                            <label className="text-xs font-medium text-secondary uppercase tracking-wider">{t('net_dns_servers')}</label>
                                             <button
                                                 onClick={() => setShowDnsModal(true)}
                                                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-accent hover:bg-accent/80 text-white rounded text-xs font-medium transition-colors"
                                             >
                                                 <Plus size={12} />
-                                                Add DNS Server
+                                                {t('net_add_dns')}
                                             </button>
                                         </div>
                                         <div className="space-y-2">
@@ -663,14 +663,14 @@ export const SettingsView = () => {
                         <section className="bg-surface border border-border rounded-lg p-6">
                             <div className="flex items-center gap-2 mb-4">
                                 <Wifi size={18} className="text-accent" />
-                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">Inbound Settings</h3>
+                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">{t('net_inbound_title')}</h3>
                             </div>
 
                             <div className="space-y-6">
                                 {/* Set System Proxy */}
                                 <ToggleRow
-                                    label="Set System Proxy"
-                                    description="Automatically configure system to use V-Nexus proxy"
+                                    label={t('net_set_system_proxy')}
+                                    description={t('net_set_system_proxy_desc')}
                                     checked={settings.setSystemProxy || false}
                                     onChange={(checked) => updateSettings({ setSystemProxy: checked })}
                                 />
@@ -678,8 +678,8 @@ export const SettingsView = () => {
                                 {/* SOCKS Settings */}
                                 <div className="pt-4 border-t border-border">
                                     <ToggleRow
-                                        label="SOCKS Settings"
-                                        description="Enable SOCKS5 proxy server"
+                                        label={t('net_socks_title')}
+                                        description={t('net_socks_desc')}
                                         checked={settings.socksEnabled || false}
                                         onChange={(checked) => updateSettings({ socksEnabled: checked })}
                                     />
@@ -688,7 +688,7 @@ export const SettingsView = () => {
                                         <div className="ml-6 pl-4 border-l-2 border-accent/30 space-y-3 mt-3">
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
-                                                    <label className="block text-xs font-medium text-secondary mb-2">Port</label>
+                                                    <label className="block text-xs font-medium text-secondary mb-2">{t('net_port')}</label>
                                                     <input
                                                         type="number"
                                                         min="1"
@@ -699,7 +699,7 @@ export const SettingsView = () => {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-secondary mb-2">UDP Local IP</label>
+                                                    <label className="block text-xs font-medium text-secondary mb-2">{t('net_udp_ip')}</label>
                                                     <input
                                                         type="text"
                                                         value={settings.socksUdpLocalIp || '127.0.0.1'}
@@ -711,15 +711,15 @@ export const SettingsView = () => {
                                             </div>
 
                                             <ToggleRow
-                                                label="UDP Support"
-                                                description="Enable UDP protocol support"
+                                                label={t('net_udp_support')}
+                                                description={t('net_udp_support_desc')}
                                                 checked={settings.socksUdpEnabled || false}
                                                 onChange={(checked) => updateSettings({ socksUdpEnabled: checked })}
                                             />
 
                                             <ToggleRow
-                                                label="Authentication"
-                                                description="Require username and password"
+                                                label={t('net_auth')}
+                                                description={t('net_auth_desc')}
                                                 checked={settings.socksAuthEnabled || false}
                                                 onChange={(checked) => updateSettings({ socksAuthEnabled: checked })}
                                             />
@@ -727,7 +727,7 @@ export const SettingsView = () => {
                                             {settings.socksAuthEnabled && (
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div>
-                                                        <label className="block text-xs font-medium text-secondary mb-2">Username</label>
+                                                        <label className="block text-xs font-medium text-secondary mb-2">{t('net_user')}</label>
                                                         <input
                                                             type="text"
                                                             value={settings.socksUsername || 'user'}
@@ -737,7 +737,7 @@ export const SettingsView = () => {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs font-medium text-secondary mb-2">Password</label>
+                                                        <label className="block text-xs font-medium text-secondary mb-2">{t('net_pass')}</label>
                                                         <input
                                                             type="password"
                                                             value={settings.socksPassword || 'pass'}
@@ -750,15 +750,15 @@ export const SettingsView = () => {
                                             )}
 
                                             <ToggleRow
-                                                label="Sniffing"
-                                                description="Enable traffic sniffing for better routing"
+                                                label={t('net_sniffing')}
+                                                description={t('net_sniffing_desc')}
                                                 checked={settings.socksSniffing || false}
                                                 onChange={(checked) => updateSettings({ socksSniffing: checked })}
                                             />
 
                                             {settings.socksSniffing && (
                                                 <div>
-                                                    <label className="block text-xs font-medium text-secondary mb-2">Destination Override</label>
+                                                    <label className="block text-xs font-medium text-secondary mb-2">{t('net_dest_override')}</label>
                                                     <div className="flex gap-4">
                                                         <label className="flex items-center gap-2 cursor-pointer">
                                                             <input
@@ -788,8 +788,8 @@ export const SettingsView = () => {
                                 {/* HTTP Settings */}
                                 <div className="pt-4 border-t border-border">
                                     <ToggleRow
-                                        label="HTTP Settings"
-                                        description="Enable HTTP proxy server"
+                                        label={t('net_http_title')}
+                                        description={t('net_http_desc')}
                                         checked={settings.httpEnabled || false}
                                         onChange={(checked) => updateSettings({ httpEnabled: checked })}
                                     />
@@ -797,7 +797,7 @@ export const SettingsView = () => {
                                     {settings.httpEnabled && settings.mode === 'advanced' && (
                                         <div className="ml-6 pl-4 border-l-2 border-accent/30 space-y-3 mt-3">
                                             <div>
-                                                <label className="block text-xs font-medium text-secondary mb-2">Port</label>
+                                                <label className="block text-xs font-medium text-secondary mb-2">{t('net_port')}</label>
                                                 <input
                                                     type="number"
                                                     min="1"
@@ -809,8 +809,8 @@ export const SettingsView = () => {
                                             </div>
 
                                             <ToggleRow
-                                                label="Authentication"
-                                                description="Require username and password"
+                                                label={t('net_auth')}
+                                                description={t('net_auth_desc')}
                                                 checked={settings.httpAuthEnabled || false}
                                                 onChange={(checked) => updateSettings({ httpAuthEnabled: checked })}
                                             />
@@ -818,7 +818,7 @@ export const SettingsView = () => {
                                             {settings.httpAuthEnabled && (
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div>
-                                                        <label className="block text-xs font-medium text-secondary mb-2">Username</label>
+                                                        <label className="block text-xs font-medium text-secondary mb-2">{t('net_user')}</label>
                                                         <input
                                                             type="text"
                                                             value={settings.httpUsername || 'user'}
@@ -828,7 +828,7 @@ export const SettingsView = () => {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs font-medium text-secondary mb-2">Password</label>
+                                                        <label className="block text-xs font-medium text-secondary mb-2">{t('net_pass')}</label>
                                                         <input
                                                             type="password"
                                                             value={settings.httpPassword || 'pass'}
@@ -841,15 +841,15 @@ export const SettingsView = () => {
                                             )}
 
                                             <ToggleRow
-                                                label="Sniffing"
-                                                description="Enable traffic sniffing for better routing"
+                                                label={t('net_sniffing')}
+                                                description={t('net_sniffing_desc')}
                                                 checked={settings.httpSniffing || false}
                                                 onChange={(checked) => updateSettings({ httpSniffing: checked })}
                                             />
 
                                             {settings.httpSniffing && (
                                                 <div>
-                                                    <label className="block text-xs font-medium text-secondary mb-2">Destination Override</label>
+                                                    <label className="block text-xs font-medium text-secondary mb-2">{t('net_dest_override')}</label>
                                                     <div className="flex gap-4">
                                                         <label className="flex items-center gap-2 cursor-pointer">
                                                             <input
@@ -880,12 +880,12 @@ export const SettingsView = () => {
                                 {settings.mode === 'advanced' && (
                                     <div className="pt-4 border-t border-border">
                                         <div className="mb-3">
-                                            <h4 className="text-sm font-medium text-primary mb-1">Browser Forwarder Settings</h4>
-                                            <p className="text-xs text-secondary italic">This applies to Simple Configs with Browser Forwarder on.</p>
+                                            <h4 className="text-sm font-medium text-primary mb-1">{t('net_browser_title')}</h4>
+                                            <p className="text-xs text-secondary italic">{t('net_browser_desc')}</p>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-xs font-medium text-secondary mb-2">Listening Address</label>
+                                                <label className="block text-xs font-medium text-secondary mb-2">{t('net_listen_addr')}</label>
                                                 <input
                                                     type="text"
                                                     value={settings.browserForwarderAddress || '127.0.0.1'}
@@ -895,7 +895,7 @@ export const SettingsView = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-medium text-secondary mb-2">Listening Port</label>
+                                                <label className="block text-xs font-medium text-secondary mb-2">{t('net_listen_port')}</label>
                                                 <input
                                                     type="number"
                                                     min="1"
@@ -916,27 +916,27 @@ export const SettingsView = () => {
                         <section className="bg-surface border border-border rounded-lg p-6">
                             <div className="flex items-center gap-2 mb-4">
                                 <SettingsIcon size={18} className="text-accent" />
-                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">Routing</h3>
+                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">{t('net_routing_title')}</h3>
                             </div>
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">Routing Mode</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('net_routing_mode')}</label>
                                     <select
                                         value={settings.routingMode}
                                         onChange={(e) => updateSettings({ routingMode: e.target.value as any })}
                                         className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
                                     >
-                                        <option value="global">Global Proxy</option>
-                                        <option value="bypass-lan">Bypass LAN</option>
-                                        <option value="bypass-china">Bypass LAN & China</option>
-                                        <option value="custom">Custom Rules</option>
+                                        <option value="global">{t('net_routing_global')}</option>
+                                        <option value="bypass-lan">{t('net_routing_bypass_lan')}</option>
+                                        <option value="bypass-china">{t('net_routing_bypass_china')}</option>
+                                        <option value="custom">{t('net_routing_custom')}</option>
                                     </select>
                                     <p className="text-xs text-secondary mt-1.5">
-                                        {settings.routingMode === 'global' && 'Route all traffic through proxy'}
-                                        {settings.routingMode === 'bypass-lan' && 'Direct connection for private IPs'}
-                                        {settings.routingMode === 'bypass-china' && 'Direct connection for LAN and China IPs'}
-                                        {settings.routingMode === 'custom' && 'Use custom routing rules'}
+                                        {settings.routingMode === 'global' && t('net_routing_desc_global')}
+                                        {settings.routingMode === 'bypass-lan' && t('net_routing_desc_bypass_lan')}
+                                        {settings.routingMode === 'bypass-china' && t('net_routing_desc_bypass_china')}
+                                        {settings.routingMode === 'custom' && t('net_routing_desc_custom')}
                                     </p>
                                 </div>
                             </div>
@@ -946,12 +946,12 @@ export const SettingsView = () => {
                         <section className="bg-surface border border-border rounded-lg p-6">
                             <div className="flex items-center gap-2 mb-4">
                                 <Wifi size={18} className="text-accent" />
-                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">Latency Testing</h3>
+                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">{t('net_latency_title')}</h3>
                             </div>
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">Test Method</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('net_latency_method')}</label>
                                     <div className="flex gap-4">
                                         <label className="flex items-center gap-2 cursor-pointer">
                                             <input
@@ -977,13 +977,13 @@ export const SettingsView = () => {
                                         </label>
                                     </div>
                                     <p className="text-xs text-secondary mt-1.5">
-                                        {(settings.latencyTestMethod || 'tcping') === 'tcping' && 'Test latency using TCP connection'}
-                                        {(settings.latencyTestMethod || 'tcping') === 'icmping' && 'Test latency using ICMP ping (requires admin)'}
+                                        {(settings.latencyTestMethod || 'tcping') === 'tcping' && t('net_latency_desc_tcp')}
+                                        {(settings.latencyTestMethod || 'tcping') === 'icmping' && t('net_latency_desc_icmp')}
                                     </p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">RealPing Test URL</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('net_latency_url')}</label>
                                     <input
                                         type="text"
                                         value={settings.realPingTestUrl || 'https://www.google.com'}
@@ -992,7 +992,7 @@ export const SettingsView = () => {
                                         className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm font-mono"
                                     />
                                     <p className="text-xs text-secondary mt-1.5">
-                                        URL used for real connection latency testing
+                                        {t('net_latency_url_desc')}
                                     </p>
                                 </div>
                             </div>
@@ -1107,16 +1107,16 @@ export const SettingsView = () => {
                                         <Shield size={32} className="text-accent" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-primary mb-2">Advanced Settings</h3>
+                                        <h3 className="text-lg font-semibold text-primary mb-2">{t('adv_promo_title')}</h3>
                                         <p className="text-secondary text-sm max-w-md">
-                                            Switch to <span className="text-accent font-medium">Advanced Mode</span> to access all technical settings including DNS configuration, proxy options, latency testing, and more.
+                                            {t('adv_promo_desc')}
                                         </p>
                                     </div>
                                     <button
                                         onClick={() => updateSettings({ mode: 'advanced' })}
                                         className="px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-md text-sm font-medium transition-colors"
                                     >
-                                        Switch to Advanced Mode
+                                        {t('adv_promo_btn')}
                                     </button>
                                 </div>
                             </section>
@@ -1129,12 +1129,12 @@ export const SettingsView = () => {
                                 <section className="bg-surface border border-border rounded-lg p-6">
                                     <div className="flex items-center gap-2 mb-4">
                                         <Shield size={18} className="text-accent" />
-                                        <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">Advanced Settings</h3>
+                                        <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">{t('settings_section_advanced')}</h3>
                                     </div>
 
                                     <div className="space-y-4">
                                         <div>
-                                            <label className="block text-xs font-medium text-secondary mb-2">Log Level</label>
+                                            <label className="block text-xs font-medium text-secondary mb-2">{t('adv_log_level')}</label>
                                             <select
                                                 value={settings.logLevel}
                                                 onChange={(e) => updateSettings({ logLevel: e.target.value as any })}
@@ -1223,22 +1223,22 @@ export const SettingsView = () => {
 
                                         <div className="pt-4 border-t border-border space-y-4">
                                             <ToggleRow
-                                                label="Test Latency Periodically"
-                                                description="Automatically test server latency at regular intervals"
+                                                label={t('net_latency_period')}
+                                                description={t('net_latency_period_desc')}
                                                 checked={settings.testLatencyPeriodically || false}
                                                 onChange={(checked) => updateSettings({ testLatencyPeriodically: checked })}
                                             />
 
                                             <ToggleRow
-                                                label="Test Latency On Connected"
-                                                description="Test latency immediately after connecting to a server"
+                                                label={t('net_latency_connected')}
+                                                description={t('net_latency_connected_desc')}
                                                 checked={settings.testLatencyOnConnected || false}
                                                 onChange={(checked) => updateSettings({ testLatencyOnConnected: checked })}
                                             />
 
                                             <ToggleRow
-                                                label="Disable System Root Certificates"
-                                                description="Don't use system root certificates for TLS verification"
+                                                label={t('net_disable_root_certs')}
+                                                description={t('net_disable_root_certs_desc')}
                                                 checked={settings.disableSystemRootCerts || false}
                                                 onChange={(checked) => updateSettings({ disableSystemRootCerts: checked })}
                                             />
@@ -1250,52 +1250,52 @@ export const SettingsView = () => {
                                 <section className="bg-surface border border-border rounded-lg p-6">
                                     <div className="flex items-center gap-2 mb-4">
                                         <Shield size={18} className="text-accent" />
-                                        <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">Connection Settings</h3>
+                                        <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">{t('net_connection_title')}</h3>
                                     </div>
 
                                     <div className="space-y-6">
                                         {/* General Connection Settings */}
                                         <div>
-                                            <h4 className="text-sm font-medium text-primary mb-3">General Connection Settings</h4>
+                                            <h4 className="text-sm font-medium text-primary mb-3">{t('net_general_connection')}</h4>
                                             <div className="space-y-3">
                                                 <ToggleRow
-                                                    label="Force Direct for All Connections"
-                                                    description="Bypass proxy for all connections"
+                                                    label={t('net_force_direct')}
+                                                    description={t('net_force_direct_desc')}
                                                     checked={settings.forceDirectConnection || false}
                                                     onChange={(checked) => updateSettings({ forceDirectConnection: checked })}
                                                 />
 
                                                 <ToggleRow
-                                                    label="Bypass Private Addresses"
-                                                    description="Direct connection for private IP ranges (192.168.x.x, 10.x.x.x, etc.)"
+                                                    label={t('net_bypass_private')}
+                                                    description={t('net_bypass_private_desc')}
                                                     checked={settings.bypassPrivateAddresses || false}
                                                     onChange={(checked) => updateSettings({ bypassPrivateAddresses: checked })}
                                                 />
 
                                                 <ToggleRow
-                                                    label="Bypass CN Mainland"
-                                                    description="Direct connection for Chinese mainland IPs"
+                                                    label={t('net_bypass_cn')}
+                                                    description={t('net_bypass_cn_desc')}
                                                     checked={settings.bypassCnMainland || false}
                                                     onChange={(checked) => updateSettings({ bypassCnMainland: checked })}
                                                 />
 
                                                 <ToggleRow
-                                                    label="Bypass Bittorrent Protocol"
-                                                    description="Direct connection for BitTorrent traffic"
+                                                    label={t('net_bypass_bt')}
+                                                    description={t('net_bypass_bt_desc')}
                                                     checked={settings.bypassBittorrent || false}
                                                     onChange={(checked) => updateSettings({ bypassBittorrent: checked })}
                                                 />
 
                                                 <ToggleRow
-                                                    label="Use V2Ray DNS for Direct Connection"
-                                                    description="Use V2Ray's DNS resolver for direct connections"
+                                                    label={t('net_use_v2ray_dns')}
+                                                    description={t('net_use_v2ray_dns_desc')}
                                                     checked={settings.useV2rayDnsForDirect || false}
                                                     onChange={(checked) => updateSettings({ useV2rayDnsForDirect: checked })}
                                                 />
 
                                                 <ToggleRow
-                                                    label="DNS Intercept"
-                                                    description="Intercept and handle DNS queries"
+                                                    label={t('net_dns_intercept')}
+                                                    description={t('net_dns_intercept_desc')}
                                                     checked={settings.dnsIntercept || false}
                                                     onChange={(checked) => updateSettings({ dnsIntercept: checked })}
                                                 />
@@ -1305,8 +1305,8 @@ export const SettingsView = () => {
                                         {/* Forward Proxy */}
                                         <div className="pt-4 border-t border-border">
                                             <ToggleRow
-                                                label="Forward Proxy"
-                                                description="Only simple config is supported"
+                                                label={t('net_forward_proxy')}
+                                                description={t('net_forward_proxy_desc')}
                                                 checked={settings.forwardProxyEnabled || false}
                                                 onChange={(checked) => updateSettings({ forwardProxyEnabled: checked })}
                                             />
@@ -1314,7 +1314,7 @@ export const SettingsView = () => {
                                             {settings.forwardProxyEnabled && (
                                                 <div className="ml-6 pl-4 border-l-2 border-accent/30 space-y-3 mt-3">
                                                     <div>
-                                                        <label className="block text-xs font-medium text-secondary mb-2">Type</label>
+                                                        <label className="block text-xs font-medium text-secondary mb-2">{t('net_forward_type')}</label>
                                                         <select
                                                             value={settings.forwardProxyType || 'http'}
                                                             onChange={(e) => updateSettings({ forwardProxyType: e.target.value as any })}
@@ -1326,7 +1326,7 @@ export const SettingsView = () => {
                                                     </div>
 
                                                     <div>
-                                                        <label className="block text-xs font-medium text-secondary mb-2">Host Address</label>
+                                                        <label className="block text-xs font-medium text-secondary mb-2">{t('net_forward_host')}</label>
                                                         <input
                                                             type="text"
                                                             value={settings.forwardProxyHost || ''}
@@ -1337,7 +1337,7 @@ export const SettingsView = () => {
                                                     </div>
 
                                                     <div>
-                                                        <label className="block text-xs font-medium text-secondary mb-2">Port</label>
+                                                        <label className="block text-xs font-medium text-secondary mb-2">{t('net_port')}</label>
                                                         <input
                                                             type="number"
                                                             min="1"
@@ -1350,8 +1350,8 @@ export const SettingsView = () => {
                                                     </div>
 
                                                     <ToggleRow
-                                                        label="Authentication"
-                                                        description="Require username and password"
+                                                        label={t('net_auth')}
+                                                        description={t('net_auth_desc')}
                                                         checked={settings.forwardProxyAuthEnabled || false}
                                                         onChange={(checked) => updateSettings({ forwardProxyAuthEnabled: checked })}
                                                     />
@@ -1359,7 +1359,7 @@ export const SettingsView = () => {
                                                     {settings.forwardProxyAuthEnabled && (
                                                         <div className="space-y-3">
                                                             <div>
-                                                                <label className="block text-xs font-medium text-secondary mb-2">Username</label>
+                                                                <label className="block text-xs font-medium text-secondary mb-2">{t('net_user')}</label>
                                                                 <input
                                                                     type="text"
                                                                     value={settings.forwardProxyUsername || ''}
@@ -1369,7 +1369,7 @@ export const SettingsView = () => {
                                                                 />
                                                             </div>
                                                             <div>
-                                                                <label className="block text-xs font-medium text-secondary mb-2">Password</label>
+                                                                <label className="block text-xs font-medium text-secondary mb-2">{t('net_pass')}</label>
                                                                 <input
                                                                     type="password"
                                                                     value={settings.forwardProxyPassword || ''}
@@ -1390,7 +1390,7 @@ export const SettingsView = () => {
                                 <section className="bg-surface border border-border rounded-lg p-6">
                                     <div className="flex items-center gap-2 mb-4">
                                         <Shield size={18} className="text-accent" />
-                                        <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">VPN Management</h3>
+                                        <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">{t('net_vpn_mgmt_title')}</h3>
                                     </div>
 
                                     <div className="space-y-4">
@@ -1398,23 +1398,23 @@ export const SettingsView = () => {
                                             onClick={handleResetVPN}
                                             className="w-full px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-primary rounded-md text-sm font-medium border border-zinc-700 transition-colors"
                                         >
-                                            Reset VPN Config
+                                            {t('net_reset_vpn')}
                                         </button>
 
                                         <button
                                             onClick={handleEraseData}
                                             className="w-full px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-md text-sm font-medium border border-red-500/30 transition-colors"
                                         >
-                                            Erase Client Data
+                                            {t('net_erase_data')}
                                         </button>
 
                                         <div className="pt-4 border-t border-border space-y-2">
                                             <div className="flex justify-between text-sm">
-                                                <span className="text-secondary">Xray Version:</span>
+                                                <span className="text-secondary">{t('net_xray_ver')}:</span>
                                                 <span className="text-primary font-mono">v1.8.7</span>
                                             </div>
                                             <div className="flex justify-between text-sm">
-                                                <span className="text-secondary">App Version:</span>
+                                                <span className="text-secondary">{t('net_app_ver')}:</span>
                                                 <span className="text-primary font-mono">v2.0.0</span>
                                             </div>
                                         </div>
@@ -1432,7 +1432,7 @@ export const SettingsView = () => {
                         <section className="bg-surface border border-border rounded-lg p-6">
                             <div className="flex items-center gap-2 mb-4">
                                 <Info size={18} className="text-accent" />
-                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">About</h3>
+                                <h3 className="text-sm font-semibold text-primary uppercase tracking-wider">{t('settings_section_about')}</h3>
                             </div>
 
                             <div className="space-y-3">
@@ -1440,24 +1440,24 @@ export const SettingsView = () => {
                                     onClick={() => setLegalDoc('privacy')}
                                     className="block text-sm text-accent hover:underline text-left"
                                 >
-                                    Privacy Policy
+                                    {t('about_privacy')}
                                 </button>
                                 <button
                                     onClick={() => setLegalDoc('terms')}
                                     className="block text-sm text-accent hover:underline text-left"
                                 >
-                                    Terms of Use
+                                    {t('about_terms')}
                                 </button>
 
                                 <div className="pt-3 border-t border-border space-y-2">
-                                    <div className="text-sm text-secondary">Contact:</div>
+                                    <div className="text-sm text-secondary">{t('about_contact')}:</div>
                                     <a href="mailto:admin@lahirux.dev" className="text-sm text-accent hover:underline">admin@lahirux.dev</a>
                                 </div>
 
                                 <div className="pt-3 border-t border-border">
                                     <div className="flex items-start justify-between gap-4">
                                         <div>
-                                            <div className="text-xs text-secondary">Current Version</div>
+                                            <div className="text-xs text-secondary">{t('about_current_ver')}</div>
                                             <div className="text-sm font-mono text-primary">v2.0.0</div>
                                         </div>
                                         <UpdateChecker />
@@ -1475,13 +1475,13 @@ export const SettingsView = () => {
                             <div className="flex items-center gap-3 mb-4">
                                 <AlertTriangle size={24} className="text-yellow-500" />
                                 <h3 className="text-lg font-semibold text-primary">
-                                    {showConfirmModal === 'reset' ? 'Reset VPN Configuration?' : 'Erase All Client Data?'}
+                                    {showConfirmModal === 'reset' ? t('modal_reset_title') : t('modal_erase_title')}
                                 </h3>
                             </div>
                             <p className="text-secondary text-sm mb-6">
                                 {showConfirmModal === 'reset'
-                                    ? 'This will reset your VPN configuration to default settings.'
-                                    : 'This will erase all profiles, settings, and data. This action cannot be undone.'}
+                                    ? t('modal_reset_desc')
+                                    : t('modal_erase_desc')}
                             </p>
                             <div className="flex gap-3 justify-end">
                                 <button
@@ -1494,7 +1494,7 @@ export const SettingsView = () => {
                                     onClick={confirmAction}
                                     className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors"
                                 >
-                                    {showConfirmModal === 'reset' ? 'Reset' : 'Erase All Data'}
+                                    {showConfirmModal === 'reset' ? t('modal_confirm_reset') : t('modal_confirm_erase')}
                                 </button>
                             </div>
                         </div>
@@ -1521,7 +1521,7 @@ export const SettingsView = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">DNS Server Address</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('modal_dns_address')}</label>
                                     <input
                                         type="text"
                                         value={customDnsValue}
@@ -1530,7 +1530,7 @@ export const SettingsView = () => {
                                         className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm font-mono"
                                     />
                                     <p className="text-xs text-secondary mt-1.5">
-                                        Supported formats: udp://, https://, tls://
+                                        {t('modal_dns_formats')}
                                     </p>
                                 </div>
                             </div>
@@ -1550,7 +1550,7 @@ export const SettingsView = () => {
                                     onClick={handleAddCustomDns}
                                     className="px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-md transition-colors"
                                 >
-                                    Add Server
+                                    {t('modal_add_server')}
                                 </button>
                             </div>
                         </div>
@@ -1576,7 +1576,7 @@ export const SettingsView = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">Protocol</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('modal_tmpl_proto')}</label>
                                     <select
                                         value={selectedTemplate?.protocol || 'vmess'}
                                         onChange={(e) => setSelectedTemplate({ ...selectedTemplate, protocol: e.target.value })}
@@ -1590,7 +1590,7 @@ export const SettingsView = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">Security</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('modal_tmpl_sec')}</label>
                                     <select
                                         value={selectedTemplate?.security || 'auto'}
                                         onChange={(e) => setSelectedTemplate({ ...selectedTemplate, security: e.target.value })}
@@ -1604,7 +1604,7 @@ export const SettingsView = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">Network</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('modal_tmpl_net')}</label>
                                     <select
                                         value={selectedTemplate?.network || 'tcp'}
                                         onChange={(e) => setSelectedTemplate({ ...selectedTemplate, network: e.target.value })}
@@ -1633,7 +1633,7 @@ export const SettingsView = () => {
                                     onClick={handleSaveTemplate}
                                     className="px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-md transition-colors"
                                 >
-                                    Save Template
+                                    {t('modal_save_tmpl')}
                                 </button>
                             </div>
                         </div>
