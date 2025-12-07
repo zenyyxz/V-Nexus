@@ -323,7 +323,13 @@ export const ConfigsView = () => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto">
-                        {profiles.length === 0 ? (
+                        {isLoading || importing ? (
+                            <div className="space-y-3 m-6">
+                                <ProfileCardSkeleton />
+                                <ProfileCardSkeleton />
+                                <ProfileCardSkeleton />
+                            </div>
+                        ) : profiles.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-center p-8">
                                 <div className="bg-gradient-to-br from-accent/10 to-accent/5 rounded-full p-6 mb-4">
                                     <FileCode size={48} className="text-accent" />
