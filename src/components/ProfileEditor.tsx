@@ -57,6 +57,18 @@ export const ProfileEditor = ({ profile, onSave, onClose }: ProfileEditorProps) 
                         />
                     </div>
 
+                    {/* Group */}
+                    <div>
+                        <label className="block text-xs font-medium text-secondary mb-1.5">Group (Optional)</label>
+                        <input
+                            type="text"
+                            value={formData.group}
+                            onChange={(e) => setFormData({ ...formData, group: e.target.value })}
+                            placeholder="e.g. My Servers"
+                            className="w-full bg-background border border-border rounded px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                        />
+                    </div>
+
                     {/* Address & Port */}
                     <div className="grid grid-cols-3 gap-3">
                         <div className="col-span-2">
