@@ -5,6 +5,7 @@ export type AppMode = 'simple' | 'advanced'
 export interface Profile {
     id: string
     isFavorite?: boolean
+    group?: string
     name: string
     protocol: 'vmess' | 'vless' | 'trojan' | 'shadowsocks' | 'socks' | 'http'
     address: string
