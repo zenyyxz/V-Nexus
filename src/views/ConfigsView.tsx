@@ -387,6 +387,13 @@ export const ConfigsView = () => {
                                                             >
                                                                 <Star size={14} fill={profile.isFavorite ? 'currentColor' : 'none'} />
                                                             </button>
+
+                                                            {profile.group && (
+                                                                <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50 hidden sm:inline-block">
+                                                                    {profile.group}
+                                                                </span>
+                                                            )}
+
                                                             {profile.latency !== undefined && (
                                                                 <div className="flex items-center gap-2">
                                                                     <span className={`text-xs px-2.5 py-1 rounded-md font-bold bg-gradient-to-r ${latencyStatus.gradient} text-white shadow-md`}>
