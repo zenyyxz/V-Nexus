@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+dist/
+dist-electron/
+
+# Build outputs
+*.log
+*.tsbuildinfo
+.vite/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Electron
+out/
+release/
+
+# Backups
+*.backup
+*.backup2

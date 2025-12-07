@@ -1,0 +1,82 @@
+{
+    "name": "v2ray-client",
+    "private": true,
+    "version": "0.1.0",
+    "main": "dist-electron/main.js",
+    "scripts": {
+        "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+        "dev:vite": "vite",
+        "dev:electron": "wait-on tcp:5173 && npm run build:electron && cross-env NODE_ENV=development electron .",
+        "build:electron": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --outdir=dist-electron --external:electron",
+        "build": "tsc && npm run build:electron && vite build && electron-builder",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "@grpc/grpc-js": "^1.14.2",
+        "@grpc/proto-loader": "^0.8.0",
+        "@types/qrcode": "^1.5.6",
+        "clsx": "^2.1.0",
+        "electron-log": "^5.4.3",
+        "electron-squirrel-startup": "^1.0.1",
+        "electron-updater": "^6.6.2",
+        "framer-motion": "^11.0.8",
+        "html5-qrcode": "^2.3.8",
+        "lucide-react": "^0.344.0",
+        "qrcode": "^1.5.4",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-router-dom": "^6.22.3",
+        "uuid": "^9.0.1",
+        "zustand": "^4.5.2"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.24",
+        "@types/react": "^18.2.64",
+        "@types/react-dom": "^18.2.21",
+        "@types/uuid": "^9.0.8",
+        "@vitejs/plugin-react": "^4.2.1",
+        "autoprefixer": "^10.4.22",
+        "concurrently": "^8.2.2",
+        "cross-env": "^7.0.3",
+        "electron": "^39.2.6",
+        "electron-builder": "^24.13.3",
+        "postcss": "^8.5.6",
+        "tailwindcss": "^3.4.1",
+        "typescript": "^5.2.2",
+        "vite": "^5.1.4",
+        "wait-on": "^7.2.0"
+    },
+    "build": {
+        "appId": "com.vnexus.client",
+        "productName": "V-Nexus",
+        "publish": [
+            {
+                "provider": "github",
+                "owner": "zenyyxz",
+                "repo": "V-Nexus"
+            }
+        ],
+        "extraResources": [
+            {
+                "from": "resources/xray",
+                "to": "xray",
+                "filter": [
+                    "**/*"
+                ]
+            }
+        ],
+        "win": {
+            "target": "nsis",
+            "icon": "build/icon.ico",
+            "signingHashAlgorithms": [
+                "sha256"
+            ],
+            "certificateFile": "build/certificate.pfx",
+            "certificatePassword": ""
+        },
+        "files": [
+            "dist/**/*",
+            "dist-electron/**/*"
+        ]
+    }
+}

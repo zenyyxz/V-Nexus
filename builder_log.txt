@@ -1,0 +1,5 @@
+  • electron-builder  version=24.13.3 os=10.0.22631
+  • description is missed in the package.json  appPackageFile=C:\Users\zenyy\Documents\Projects\v2ray client\package.json
+  • author is missed in the package.json  appPackageFile=C:\Users\zenyy\Documents\Projects\v2ray client\package.json
+  • packaging       platform=win32 arch=x64 electron=29.4.6 appOutDir=dist\win-unpacked
+  ⨯ EBUSY: resource busy or locked, rename 'C:\Users\zenyy\Documents\Projects\v2ray client\dist\win-unpacked\electron.exe' -> 'C:\Users\zenyy\Documents\Projects\v2ray client\dist\win-unpacked\v2ray-client.exe'  failedTask=build stackTrace=Error: EBUSY: resource busy or locked, rename 'C:\Users\zenyy\Documents\Projects\v2ray client\dist\win-unpacked\electron.exe' -> 'C:\Users\zenyy\Documents\Projects\v2ray client\dist\win-unpacked\v2ray-client.exe'
