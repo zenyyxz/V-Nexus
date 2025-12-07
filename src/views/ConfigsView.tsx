@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from '../hooks/useTranslation'
 import { useApp } from '../contexts/AppContext'
 import { useToast } from '../contexts/ToastContext'
 import { parseProfileLink, parseJSONProfile, generateProfileLink, generateV2RayJSON } from '../utils/profile-parser'
@@ -32,6 +33,7 @@ const calculateStats = (profiles: any[]) => {
 
 export const ConfigsView = () => {
     const { profiles, addProfile, removeProfile, updateProfile, settings } = useApp()
+    const { t } = useTranslation()
     const { showToast } = useToast()
     const [showImportMenu, setShowImportMenu] = useState(false)
     const [editingProfile, setEditingProfile] = useState<string | null>(null)
@@ -387,13 +389,6 @@ export const ConfigsView = () => {
                                                             >
                                                                 <Star size={14} fill={profile.isFavorite ? 'currentColor' : 'none'} />
                                                             </button>
-
-                                                            {profile.group && (
-                                                                <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50 hidden sm:inline-block">
-                                                                    {profile.group}
-                                                                </span>
-                                                            )}
-
                                                             {profile.latency !== undefined && (
                                                                 <div className="flex items-center gap-2">
                                                                     <span className={`text-xs px-2.5 py-1 rounded-md font-bold bg-gradient-to-r ${latencyStatus.gradient} text-white shadow-md`}>
@@ -427,86 +422,94 @@ export const ConfigsView = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Action Buttons */}
-                                                    <div className="flex items-center gap-1.5">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handlePing(profile.id) }}
-                                                            className="p-2 hover:bg-yellow-500/10 rounded-lg text-zinc-400 hover:text-yellow-400 transition-all hover:scale-105"
-                                                            title="Test Latency"
-                                                        >
-                                                            <Zap size={16} />
-                                                        </button>
-
-                                                        <div className="relative">
+                                                    {/* Action Buttons & Group Badge */}
+                                                    <div className="flex flex-col items-end gap-2">
+                                                        <div className="flex items-center gap-1.5">
                                                             <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    setShareMenuOpen(shareMenuOpen === profile.id ? null : profile.id)
-                                                                }}
-                                                                className={`p-2 rounded-lg transition-all hover:scale-105 ${shareMenuOpen === profile.id ? 'text-accent bg-accent/15' : 'text-zinc-400 hover:text-accent hover:bg-accent/10'}`}
-                                                                title="Share Config"
+                                                                onClick={(e) => { e.stopPropagation(); handlePing(profile.id) }}
+                                                                className="p-2 hover:bg-yellow-500/10 rounded-lg text-zinc-400 hover:text-yellow-400 transition-all hover:scale-105"
+                                                                title="Test Latency"
                                                             >
-                                                                <Share2 size={16} />
+                                                                <Zap size={16} />
                                                             </button>
 
-                                                            {/* Share Dropdown */}
-                                                            {shareMenuOpen === profile.id && (
-                                                                <div className="absolute right-0 mt-2 w-52 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-scale-in backdrop-blur-xl">
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleShareQR(profile) }}
-                                                                        className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
-                                                                    >
-                                                                        <QrCode size={16} className="text-zinc-400" />
-                                                                        Show QR Code
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleCopyLink(profile) }}
-                                                                        className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
-                                                                    >
-                                                                        <Copy size={16} className="text-zinc-400" />
-                                                                        Copy Link
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleCopyJSON(profile) }}
-                                                                        className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
-                                                                    >
-                                                                        <FileJson size={16} className="text-zinc-400" />
-                                                                        Copy V2Ray JSON
-                                                                    </button>
-                                                                    <div className="h-px bg-zinc-700/50 my-1" />
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleShareLocked(profile) }}
-                                                                        className="w-full px-4 py-2 hover:bg-white/5 transition-colors flex items-center gap-2 text-left text-sm text-yellow-500"
-                                                                    >
-                                                                        <Lock size={14} />
-                                                                        Create Locked Link
-                                                                    </button>
-                                                                </div>
-                                                            )}
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        setShareMenuOpen(shareMenuOpen === profile.id ? null : profile.id)
+                                                                    }}
+                                                                    className={`p-2 rounded-lg transition-all hover:scale-105 ${shareMenuOpen === profile.id ? 'text-accent bg-accent/15' : 'text-zinc-400 hover:text-accent hover:bg-accent/10'}`}
+                                                                    title="Share Config"
+                                                                >
+                                                                    <Share2 size={16} />
+                                                                </button>
+
+                                                                {/* Share Dropdown */}
+                                                                {shareMenuOpen === profile.id && (
+                                                                    <div className="absolute right-0 mt-2 w-52 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-scale-in backdrop-blur-xl">
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleShareQR(profile) }}
+                                                                            className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
+                                                                        >
+                                                                            <QrCode size={16} className="text-zinc-400" />
+                                                                            Show QR Code
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleCopyLink(profile) }}
+                                                                            className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
+                                                                        >
+                                                                            <Copy size={16} className="text-zinc-400" />
+                                                                            Copy Link
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleCopyJSON(profile) }}
+                                                                            className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
+                                                                        >
+                                                                            <FileJson size={16} className="text-zinc-400" />
+                                                                            Copy V2Ray JSON
+                                                                        </button>
+                                                                        <div className="h-px bg-zinc-700/50 my-1" />
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleShareLocked(profile) }}
+                                                                            className="w-full px-4 py-2 hover:bg-white/5 transition-colors flex items-center gap-2 text-left text-sm text-yellow-500"
+                                                                        >
+                                                                            <Lock size={14} />
+                                                                            Create Locked Link
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setEditingProfile(profile.id) }}
+                                                                className="p-2 hover:bg-blue-500/10 rounded-lg text-zinc-400 hover:text-blue-400 transition-all hover:scale-105"
+                                                                title="Edit Config"
+                                                            >
+                                                                <Edit size={16} />
+                                                            </button>
+
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setJsonEditingProfile(profile) }}
+                                                                className="p-2 hover:bg-purple-500/10 rounded-lg text-zinc-400 hover:text-purple-400 transition-all hover:scale-105"
+                                                                title="Edit as JSON"
+                                                            >
+                                                                <CodeSlashIcon size={16} />
+                                                            </button>
+
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: profile.id, name: profile.name }) }}
+                                                                className="p-2 hover:bg-red-500/10 rounded-lg text-secondary hover:text-red-500 transition-all hover-lift"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
                                                         </div>
 
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setEditingProfile(profile.id) }}
-                                                            className="p-2 hover:bg-blue-500/10 rounded-lg text-zinc-400 hover:text-blue-400 transition-all hover:scale-105"
-                                                            title="Edit Config"
-                                                        >
-                                                            <Edit size={16} />
-                                                        </button>
-
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setJsonEditingProfile(profile) }}
-                                                            className="p-2 hover:bg-purple-500/10 rounded-lg text-zinc-400 hover:text-purple-400 transition-all hover:scale-105"
-                                                            title="Edit as JSON"
-                                                        >
-                                                            <CodeSlashIcon size={16} />
-                                                        </button>
-
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: profile.id, name: profile.name }) }}
-                                                            className="p-2 hover:bg-red-500/10 rounded-lg text-secondary hover:text-red-500 transition-all hover-lift"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                        {profile.group && (
+                                                            <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50">
+                                                                {profile.group}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

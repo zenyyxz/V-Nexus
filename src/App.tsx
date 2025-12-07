@@ -13,6 +13,7 @@ import { ErrorRecovery } from './components/ErrorRecovery'
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner'
 import { useApp } from './contexts/AppContext'
 import { useUpdateChecker } from './hooks/useUpdateChecker'
+import { useTranslation } from './hooks/useTranslation'
 
 function AnimatedRoutes() {
     const location = useLocation()
@@ -70,12 +71,14 @@ function App() {
         }
     }, [settings.theme])
 
+    const { t } = useTranslation()
+
     const navItems = [
-        { to: '/', icon: <Home size={18} />, label: 'Home' },
-        { to: '/configs', icon: <FileCode size={18} />, label: 'Configs' },
-        { to: '/connections', icon: <Activity size={18} />, label: 'Connections' },
-        { to: '/logs', icon: <FileText size={18} />, label: 'Logs' },
-        { to: '/settings', icon: <Settings size={18} />, label: 'Settings' }
+        { to: '/', icon: <Home size={18} />, label: t('nav_home') },
+        { to: '/configs', icon: <FileCode size={18} />, label: t('nav_configs') },
+        { to: '/connections', icon: <Activity size={18} />, label: t('nav_connections') },
+        { to: '/logs', icon: <FileText size={18} />, label: t('nav_logs') },
+        { to: '/settings', icon: <Settings size={18} />, label: t('nav_settings') }
     ]
 
     return (

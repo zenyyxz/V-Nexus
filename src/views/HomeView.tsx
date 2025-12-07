@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from '../hooks/useTranslation'
 import { useApp } from '../contexts/AppContext'
 import { useToast } from '../contexts/ToastContext'
 import { useRealStats } from '../hooks/useRealStats'
@@ -57,6 +58,7 @@ const formatBytes = (bytes: number) => {
 export const HomeView = () => {
     const { stats, sessionStats, profiles, activeProfileId, setActiveProfile, updateProfile, settings, isConnected, setConnected, updateSessionStats, updateSettings, connectedAt } = useApp()
     const { showToast } = useToast()
+    const { t } = useTranslation()
     useRealStats()
     const { markManualDisconnect } = useReconnect()
     useHealthCheck()
@@ -557,8 +559,12 @@ export const HomeView = () => {
                                                         Ping
                                                     </button>
                                                 </div>
-                                                <div className="text-xs text-secondary font-mono truncate">
-                                                    {profile.address}:{profile.port} • {profile.protocol}
+                                                <div className="text-xs text-secondary font-mono truncate flex items-center gap-2">
+                                                    {profile.address}:{profile.port}
+                                                    <span className="text-zinc-600">•</span>
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-400 uppercase tracking-wide border border-blue-500/30">
+                                                        {profile.protocol || 'vmess'}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
