@@ -201,8 +201,8 @@ export const ConfigsView = () => {
                     <div className="flex items-center gap-3">
                         <FileCode size={24} className="text-accent" />
                         <div>
-                            <h2 className="text-2xl font-semibold text-primary tracking-tight">Configurations</h2>
-                            <p className="text-secondary text-sm mt-1">Manage your server profiles and configurations.</p>
+                            <h2 className="text-2xl font-semibold text-primary tracking-tight">{t('configs_title')}</h2>
+                            <p className="text-secondary text-sm mt-1">{t('configs_subtitle')}</p>
                         </div>
                     </div>
 
@@ -217,7 +217,7 @@ export const ConfigsView = () => {
                             title="Export all profiles to JSON file"
                         >
                             <FileJson size={16} className="inline mr-2" />
-                            Export All
+                            {t('export_all')}
                         </button>
 
                         {/* Import Button */}
@@ -228,7 +228,7 @@ export const ConfigsView = () => {
                                 className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-lg font-medium text-sm transition-all shadow-lg hover-lift disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Plus size={18} className={importing ? 'animate-spin' : ''} />
-                                {importing ? 'Importing...' : 'Import Config'}
+                                {importing ? t('importing') : t('import_config')}
                             </button>
 
                             {/* Import Dropdown */}

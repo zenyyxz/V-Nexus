@@ -371,8 +371,8 @@ export const HomeView = () => {
                     <div className="flex items-center gap-3">
                         <Home size={24} className="text-accent" />
                         <div>
-                            <h2 className="text-2xl font-semibold text-primary tracking-tight">Home</h2>
-                            <p className="text-secondary text-sm mt-1">Monitor your connection and select profiles.</p>
+                            <h2 className="text-2xl font-semibold text-primary tracking-tight">{t('nav_home')}</h2>
+                            <p className="text-secondary text-sm mt-1">{t('home_subtitle')}</p>
                         </div>
                     </div>
 
@@ -467,7 +467,7 @@ export const HomeView = () => {
                     <div className="flex items-center gap-3">
                         <Zap size={18} className="text-yellow-500" />
                         <div>
-                            <div className="text-sm font-medium text-primary">Auto-Select Fastest Server</div>
+                            <div className="text-sm font-medium text-primary">{t('auto_select')}</div>
                             <div className="text-xs text-secondary mt-0.5">Automatically connect to the server with lowest latency</div>
                         </div>
                     </div>
@@ -485,7 +485,7 @@ export const HomeView = () => {
                 {/* Quick Select Section */}
                 <div className="bg-surface border border-border rounded-lg overflow-hidden">
                     <div className="p-4 bg-background/50 flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-primary">Quick Select</h3>
+                        <h3 className="text-sm font-semibold text-primary">{t('quick_select')}</h3>
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={handlePingAll}
