@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from '../hooks/useTranslation'
 import { useApp } from '../contexts/AppContext'
 import { useToast } from '../contexts/ToastContext'
 import { UpdateChecker } from '../components/UpdateChecker'
@@ -47,6 +48,7 @@ const ToggleRow = ({ label, description, checked, onChange }: { label: string, d
 
 export const SettingsView = () => {
     const { settings, updateSettings } = useApp()
+    const { t } = useTranslation()
     const { showToast } = useToast()
     const [copied, setCopied] = useState(false)
     const [customUserAgent, setCustomUserAgent] = useState('')
@@ -61,10 +63,10 @@ export const SettingsView = () => {
     const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
 
     const tabs = [
-        { id: 'general' as const, label: 'General', icon: SettingsIcon },
-        { id: 'network' as const, label: 'Network', icon: Wifi },
-        { id: 'advanced' as const, label: 'Advanced', icon: Shield },
-        { id: 'about' as const, label: 'About', icon: Info }
+        { id: 'general' as const, label: t('settings_section_general'), icon: SettingsIcon },
+        { id: 'network' as const, label: t('settings_section_network'), icon: Wifi },
+        { id: 'advanced' as const, label: t('settings_section_advanced'), icon: Shield },
+        { id: 'about' as const, label: t('settings_section_about'), icon: Info }
     ]
 
     const handleCopyDeviceId = () => {
@@ -303,7 +305,7 @@ export const SettingsView = () => {
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">Language</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('settings_language')}</label>
                                     <select
                                         value={settings.language}
                                         onChange={(e) => updateSettings({ language: e.target.value })}
@@ -317,7 +319,7 @@ export const SettingsView = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-medium text-secondary mb-2">Device ID</label>
+                                    <label className="block text-xs font-medium text-secondary mb-2">{t('settings_device_id')}</label>
                                     <div className="flex gap-2">
                                         <input
                                             type="text"

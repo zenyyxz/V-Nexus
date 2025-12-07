@@ -1,23 +1,25 @@
 import { useState } from 'react'
+import { useTranslation } from '../hooks/useTranslation'
 import { ConnectionEditor } from '../components/editors/ConnectionEditor'
 import { RoutingEditor } from '../components/editors/RoutingEditor'
 
 export const AdvancedView = () => {
     const [activeTab, setActiveTab] = useState<'config' | 'connections' | 'routing'>('config')
+    const { t } = useTranslation()
 
     return (
         <div className="h-full flex flex-col">
             <header className="mb-6 px-6 flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-semibold text-primary tracking-tight">Configuration</h2>
-                    <p className="text-secondary text-sm mt-1">Advanced control over V2Ray core settings.</p>
+                    <h2 className="text-2xl font-semibold text-primary tracking-tight">{t('adv_title')}</h2>
+                    <p className="text-secondary text-sm mt-1">{t('adv_subtitle')}</p>
                 </div>
                 <div className="flex gap-2">
                     <button className="px-3 py-1.5 text-xs font-medium bg-zinc-800 text-zinc-300 hover:text-white rounded border border-zinc-700 hover:border-zinc-600 transition-all">
-                        Reset Defaults
+                        {t('adv_reset')}
                     </button>
                     <button className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded shadow-sm transition-all border border-blue-500">
-                        Save Changes
+                        {t('adv_save')}
                     </button>
                 </div>
             </header>
@@ -28,19 +30,19 @@ export const AdvancedView = () => {
                         onClick={() => setActiveTab('config')}
                         className={`px-5 py-3 text-sm font-medium border-r border-border transition-colors ${activeTab === 'config' ? 'bg-surface text-primary border-b-2 border-b-accent' : 'text-secondary hover:text-primary hover:bg-white/5'}`}
                     >
-                        config.json
+                        {t('adv_tab_config')}
                     </button>
                     <button
                         onClick={() => setActiveTab('connections')}
                         className={`px-5 py-3 text-sm font-medium border-r border-border transition-colors ${activeTab === 'connections' ? 'bg-surface text-primary border-b-2 border-b-accent' : 'text-secondary hover:text-primary hover:bg-white/5'}`}
                     >
-                        Connection Editor
+                        {t('adv_tab_connection')}
                     </button>
                     <button
                         onClick={() => setActiveTab('routing')}
                         className={`px-5 py-3 text-sm font-medium border-r border-border transition-colors ${activeTab === 'routing' ? 'bg-surface text-primary border-b-2 border-b-accent' : 'text-secondary hover:text-primary hover:bg-white/5'}`}
                     >
-                        Routing Rules
+                        {t('adv_tab_routing')}
                     </button>
                 </div>
 

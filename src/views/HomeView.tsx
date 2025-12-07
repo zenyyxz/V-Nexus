@@ -409,7 +409,7 @@ export const HomeView = () => {
                     <div className="bg-surface border border-border rounded-lg p-4 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                             <HardDrive size={16} className="text-secondary flex-shrink-0" />
-                            <span className="text-xs font-medium text-secondary uppercase tracking-wider">Memory</span>
+                            <span className="text-xs font-medium text-secondary uppercase tracking-wider">{t('stat_memory')}</span>
                         </div>
                         <div className="text-2xl font-semibold text-primary w-24 truncate">{stats.memoryUsage} MB</div>
                     </div>
@@ -417,25 +417,25 @@ export const HomeView = () => {
                     <div className="bg-surface border border-border rounded-lg p-4 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                             <Upload size={16} className="text-emerald-500 flex-shrink-0" />
-                            <span className="text-xs font-medium text-secondary uppercase tracking-wider">Upload</span>
+                            <span className="text-xs font-medium text-secondary uppercase tracking-wider">{t('stat_upload')}</span>
                         </div>
                         <div className="text-2xl font-semibold text-emerald-500 w-32 truncate">{formatBytes(sessionStats?.uploaded || 0)}</div>
-                        <div className="text-xs text-secondary mt-1 w-32 truncate">Session: {formatBytes(sessionStats?.uploaded || 0)}</div>
+                        <div className="text-xs text-secondary mt-1 w-32 truncate">{t('stat_session')}: {formatBytes(sessionStats?.uploaded || 0)}</div>
                     </div>
 
                     <div className="bg-surface border border-border rounded-lg p-4 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                             <Download size={16} className="text-blue-500 flex-shrink-0" />
-                            <span className="text-xs font-medium text-secondary uppercase tracking-wider">Download</span>
+                            <span className="text-xs font-medium text-secondary uppercase tracking-wider">{t('stat_download')}</span>
                         </div>
                         <div className="text-2xl font-semibold text-blue-500 w-32 truncate">{formatBytes(sessionStats?.downloaded || 0)}</div>
-                        <div className="text-xs text-secondary mt-1 w-32 truncate">Session: {formatBytes(sessionStats?.downloaded || 0)}</div>
+                        <div className="text-xs text-secondary mt-1 w-32 truncate">{t('stat_session')}: {formatBytes(sessionStats?.downloaded || 0)}</div>
                     </div>
 
                     <div className="bg-surface border border-border rounded-lg p-4 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                             <Server size={16} className="text-purple-500 flex-shrink-0" />
-                            <span className="text-xs font-medium text-secondary uppercase tracking-wider">Server</span>
+                            <span className="text-xs font-medium text-secondary uppercase tracking-wider">{t('stat_server')}</span>
                         </div>
                         {isConnected && sessionStats?.connectedIp ? (
                             <>
@@ -455,7 +455,7 @@ export const HomeView = () => {
                                 </div>
                             </>
                         ) : (
-                            <div className="text-2xl font-semibold text-secondary w-32">Not Connected</div>
+                            <div className="text-2xl font-semibold text-secondary w-32">{t('stat_not_connected')}</div>
                         )}
                     </div>
                 </div>
