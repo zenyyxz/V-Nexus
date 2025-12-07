@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from '../hooks/useTranslation'
 import { useApp } from '../contexts/AppContext'
 import { FileText, Download, Trash2 } from 'lucide-react'
 
 export const LogsView = () => {
     const { settings } = useApp()
+    const { t } = useTranslation()
     const [logs, setLogs] = useState<string[]>([])
     const [autoRefresh, setAutoRefresh] = useState(true)
 
@@ -59,8 +61,8 @@ export const LogsView = () => {
                     <div className="flex items-center gap-3">
                         <FileText size={24} className="text-accent" />
                         <div>
-                            <h2 className="text-2xl font-semibold text-primary tracking-tight">Logs</h2>
-                            <p className="text-secondary text-sm mt-1">View application and connection logs.</p>
+                            <h2 className="text-2xl font-semibold text-primary tracking-tight">{t('logs_title')}</h2>
+                            <p className="text-secondary text-sm mt-1">{t('logs_subtitle')}</p>
                         </div>
                     </div>
                     <div className="flex gap-2 items-center">
@@ -71,21 +73,21 @@ export const LogsView = () => {
                                 onChange={(e) => setAutoRefresh(e.target.checked)}
                                 className="rounded border-border bg-background"
                             />
-                            Auto-refresh
+                            {t('logs_auto_refresh')}
                         </label>
                         <button
                             onClick={handleExport}
                             className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-lg text-sm font-medium transition-colors"
                         >
                             <Download size={16} />
-                            Export
+                            {t('logs_export')}
                         </button>
                         <button
                             onClick={handleClear}
                             className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-sm font-medium border border-red-500/30 transition-colors"
                         >
                             <Trash2 size={16} />
-                            Clear
+                            {t('logs_clear')}
                         </button>
                     </div>
                 </div>
@@ -93,15 +95,15 @@ export const LogsView = () => {
 
             <div className="flex-1 bg-surface border border-border rounded-2xl overflow-hidden flex flex-col mx-6 mb-6">
                 <div className="p-4 border-b border-border bg-background/50 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-primary">Application Logs</h3>
-                    <span className="text-xs text-secondary">{logs.length} entries</span>
+                    <h3 className="text-sm font-semibold text-primary">{t('logs_app_logs')}</h3>
+                    <span className="text-xs text-secondary">{logs.length} {t('logs_entries')}</span>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-5 font-mono text-sm leading-relaxed">
                     {logs.length === 0 ? (
                         <div className="text-center text-secondary py-12">
                             <FileText size={48} className="mx-auto mb-4 opacity-30" />
-                            <p className="text-base">No logs yet. Start a connection to see logs.</p>
+                            <p className="text-base">{t('logs_empty')}. {t('logs_empty_desc')}</p>
                         </div>
                     ) : (
                         <div className="space-y-0.5">

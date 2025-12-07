@@ -248,7 +248,6 @@ export const SettingsView = () => {
                                 : 'text-secondary hover:text-primary'
                                 }`}
                         >
-                        >
                             {t('settings_simple')}
                         </button>
                         <button
