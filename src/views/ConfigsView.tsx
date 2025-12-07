@@ -347,7 +347,19 @@ export const ConfigsView = () => {
                         ) : (
                             <div className="space-y-3 m-6">
                                 {profiles
-                                    .sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0))
+                                    .sort((a, b) => {
+                                        // 1. Favorites
+                                        const favDiff = (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0)
+                                        if (favDiff !== 0) return favDiff
+
+                                        // 2. Groups
+                                        const groupA = a.group || ''
+                                        const groupB = b.group || ''
+                                        if (groupA !== groupB) return groupA.localeCompare(groupB)
+
+                                        // 3. Name
+                                        return a.name.localeCompare(b.name)
+                                    })
                                     .map((profile) => {
                                         const latencyStatus = getLatencyStatus(profile.latency)
                                         return (
