@@ -10,7 +10,7 @@ import { LockShareModal } from '../components/LockShareModal'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { JSONEditorModal } from '../components/JSONEditorModal'
 import { CodeSlashIcon } from '../components/icons/CodeSlashIcon'
-import { FileCode, Plus, Clipboard, FileJson, Link2, Trash2, Edit, Zap, Share2, QrCode, Copy, Activity, TrendingUp, Server, Lock } from 'lucide-react'
+import { FileCode, Plus, Clipboard, FileJson, Link2, Trash2, Edit, Zap, Share2, QrCode, Copy, Activity, TrendingUp, Server, Lock, Star } from 'lucide-react'
 
 // Helper function to get latency status with colors and labels
 const getLatencyStatus = (latency: number | undefined) => {
@@ -316,141 +316,153 @@ export const ConfigsView = () => {
                             </div>
                         ) : (
                             <div className="space-y-3 m-6">
-                                {profiles.map((profile) => {
-                                    const latencyStatus = getLatencyStatus(profile.latency)
-                                    return (
-                                        <div
-                                            key={profile.id}
-                                            className="group relative bg-black/80 backdrop-blur-sm border border-zinc-800/50 rounded-xl p-4 hover:border-zinc-700/50 hover:bg-black/90 transition-all duration-200 animate-fade-in overflow-hidden"
-                                        >
-                                            {/* Subtle gradient overlay on hover */}
-                                            <div className="absolute inset-0 bg-gradient-to-r from-accent/0 via-accent/5 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                                {profiles
+                                    .sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0))
+                                    .map((profile) => {
+                                        const latencyStatus = getLatencyStatus(profile.latency)
+                                        return (
+                                            <div
+                                                key={profile.id}
+                                                className="group relative bg-black/80 backdrop-blur-sm border border-zinc-800/50 rounded-xl p-4 hover:border-zinc-700/50 hover:bg-black/90 transition-all duration-200 animate-fade-in overflow-hidden"
+                                            >
+                                                {/* Subtle gradient overlay on hover */}
+                                                <div className="absolute inset-0 bg-gradient-to-r from-accent/0 via-accent/5 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-                                            <div className="relative flex items-start justify-between gap-4">
-                                                <div className="flex-1 min-w-0 space-y-2.5">
-                                                    {/* Profile Name & Latency */}
-                                                    <div className="flex items-center gap-3">
-                                                        <h4 className="font-semibold text-primary truncate group-hover:text-accent transition-colors text-base">
-                                                            {profile.name}
-                                                        </h4>
-                                                        {profile.latency !== undefined && (
-                                                            <div className="flex items-center gap-2">
-                                                                <span className={`text-xs px-2.5 py-1 rounded-md font-bold bg-gradient-to-r ${latencyStatus.gradient} text-white shadow-md`}>
-                                                                    {profile.latency < 4000 ? `${profile.latency}ms` : 'Timeout'}
-                                                                </span>
-                                                                {profile.latency < 4000 && (
-                                                                    <span className={`text-xs px-2.5 py-1 rounded-md border ${latencyStatus.bg} ${latencyStatus.text} ${latencyStatus.border} font-medium`}>
-                                                                        {latencyStatus.label}
+                                                <div className="relative flex items-start justify-between gap-4">
+                                                    <div className="flex-1 min-w-0 space-y-2.5">
+                                                        {/* Profile Name & Latency */}
+                                                        <div className="flex items-center gap-3">
+                                                            <h4 className="font-semibold text-primary truncate group-hover:text-accent transition-colors text-base">
+                                                                {profile.name}
+                                                            </h4>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    updateProfile(profile.id, { isFavorite: !profile.isFavorite })
+                                                                }}
+                                                                className={`p-1 rounded transition-colors ${profile.isFavorite ? 'text-yellow-400 hover:text-yellow-300' : 'text-zinc-600 hover:text-yellow-400'}`}
+                                                                title={profile.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                                            >
+                                                                <Star size={14} fill={profile.isFavorite ? 'currentColor' : 'none'} />
+                                                            </button>
+                                                            {profile.latency !== undefined && (
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={`text-xs px-2.5 py-1 rounded-md font-bold bg-gradient-to-r ${latencyStatus.gradient} text-white shadow-md`}>
+                                                                        {profile.latency < 4000 ? `${profile.latency}ms` : 'Timeout'}
                                                                     </span>
-                                                                )}
+                                                                    {profile.latency < 4000 && (
+                                                                        <span className={`text-xs px-2.5 py-1 rounded-md border ${latencyStatus.bg} ${latencyStatus.text} ${latencyStatus.border} font-medium`}>
+                                                                            {latencyStatus.label}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Address & Protocol */}
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="font-mono text-xs bg-black/60 px-3 py-1.5 rounded-md border border-zinc-800/50 text-zinc-300 backdrop-blur-sm">
+                                                                {profile.address}:{profile.port}
                                                             </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Address & Protocol */}
-                                                    <div className="flex items-center gap-2.5">
-                                                        <div className="font-mono text-xs bg-black/60 px-3 py-1.5 rounded-md border border-zinc-800/50 text-zinc-300 backdrop-blur-sm">
-                                                            {profile.address}:{profile.port}
+                                                            <div className="text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/15 text-blue-400 uppercase tracking-wide border border-blue-500/30">
+                                                                {profile.protocol || 'vmess'}
+                                                            </div>
                                                         </div>
-                                                        <div className="text-xs font-bold px-2.5 py-1 rounded-md bg-blue-500/15 text-blue-400 uppercase tracking-wide border border-blue-500/30">
-                                                            {profile.protocol || 'vmess'}
+
+                                                        {/* Security Info */}
+                                                        <div className="text-xs text-zinc-500 flex items-center gap-2 pl-1">
+                                                            <span className="w-1 h-1 rounded-full bg-zinc-600" />
+                                                            <span>{profile.network || 'tcp'}</span>
+                                                            <span className="w-1 h-1 rounded-full bg-zinc-600" />
+                                                            <span>{profile.security || 'none'}</span>
                                                         </div>
                                                     </div>
 
-                                                    {/* Security Info */}
-                                                    <div className="text-xs text-zinc-500 flex items-center gap-2 pl-1">
-                                                        <span className="w-1 h-1 rounded-full bg-zinc-600" />
-                                                        <span>{profile.network || 'tcp'}</span>
-                                                        <span className="w-1 h-1 rounded-full bg-zinc-600" />
-                                                        <span>{profile.security || 'none'}</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Action Buttons */}
-                                                <div className="flex items-center gap-1.5">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handlePing(profile.id) }}
-                                                        className="p-2 hover:bg-yellow-500/10 rounded-lg text-zinc-400 hover:text-yellow-400 transition-all hover:scale-105"
-                                                        title="Test Latency"
-                                                    >
-                                                        <Zap size={16} />
-                                                    </button>
-
-                                                    <div className="relative">
+                                                    {/* Action Buttons */}
+                                                    <div className="flex items-center gap-1.5">
                                                         <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                setShareMenuOpen(shareMenuOpen === profile.id ? null : profile.id)
-                                                            }}
-                                                            className={`p-2 rounded-lg transition-all hover:scale-105 ${shareMenuOpen === profile.id ? 'text-accent bg-accent/15' : 'text-zinc-400 hover:text-accent hover:bg-accent/10'}`}
-                                                            title="Share Config"
+                                                            onClick={(e) => { e.stopPropagation(); handlePing(profile.id) }}
+                                                            className="p-2 hover:bg-yellow-500/10 rounded-lg text-zinc-400 hover:text-yellow-400 transition-all hover:scale-105"
+                                                            title="Test Latency"
                                                         >
-                                                            <Share2 size={16} />
+                                                            <Zap size={16} />
                                                         </button>
 
-                                                        {/* Share Dropdown */}
-                                                        {shareMenuOpen === profile.id && (
-                                                            <div className="absolute right-0 mt-2 w-52 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-scale-in backdrop-blur-xl">
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleShareQR(profile) }}
-                                                                    className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
-                                                                >
-                                                                    <QrCode size={16} className="text-zinc-400" />
-                                                                    Show QR Code
-                                                                </button>
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleCopyLink(profile) }}
-                                                                    className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
-                                                                >
-                                                                    <Copy size={16} className="text-zinc-400" />
-                                                                    Copy Link
-                                                                </button>
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleCopyJSON(profile) }}
-                                                                    className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
-                                                                >
-                                                                    <FileJson size={16} className="text-zinc-400" />
-                                                                    Copy V2Ray JSON
-                                                                </button>
-                                                                <div className="h-px bg-zinc-700/50 my-1" />
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleShareLocked(profile) }}
-                                                                    className="w-full px-4 py-2 hover:bg-white/5 transition-colors flex items-center gap-2 text-left text-sm text-yellow-500"
-                                                                >
-                                                                    <Lock size={14} />
-                                                                    Create Locked Link
-                                                                </button>
-                                                            </div>
-                                                        )}
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    setShareMenuOpen(shareMenuOpen === profile.id ? null : profile.id)
+                                                                }}
+                                                                className={`p-2 rounded-lg transition-all hover:scale-105 ${shareMenuOpen === profile.id ? 'text-accent bg-accent/15' : 'text-zinc-400 hover:text-accent hover:bg-accent/10'}`}
+                                                                title="Share Config"
+                                                            >
+                                                                <Share2 size={16} />
+                                                            </button>
+
+                                                            {/* Share Dropdown */}
+                                                            {shareMenuOpen === profile.id && (
+                                                                <div className="absolute right-0 mt-2 w-52 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-scale-in backdrop-blur-xl">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleShareQR(profile) }}
+                                                                        className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
+                                                                    >
+                                                                        <QrCode size={16} className="text-zinc-400" />
+                                                                        Show QR Code
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleCopyLink(profile) }}
+                                                                        className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
+                                                                    >
+                                                                        <Copy size={16} className="text-zinc-400" />
+                                                                        Copy Link
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleCopyJSON(profile) }}
+                                                                        className="w-full px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3 text-left text-sm text-primary"
+                                                                    >
+                                                                        <FileJson size={16} className="text-zinc-400" />
+                                                                        Copy V2Ray JSON
+                                                                    </button>
+                                                                    <div className="h-px bg-zinc-700/50 my-1" />
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleShareLocked(profile) }}
+                                                                        className="w-full px-4 py-2 hover:bg-white/5 transition-colors flex items-center gap-2 text-left text-sm text-yellow-500"
+                                                                    >
+                                                                        <Lock size={14} />
+                                                                        Create Locked Link
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setEditingProfile(profile.id) }}
+                                                            className="p-2 hover:bg-blue-500/10 rounded-lg text-zinc-400 hover:text-blue-400 transition-all hover:scale-105"
+                                                            title="Edit Config"
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setJsonEditingProfile(profile) }}
+                                                            className="p-2 hover:bg-purple-500/10 rounded-lg text-zinc-400 hover:text-purple-400 transition-all hover:scale-105"
+                                                            title="Edit as JSON"
+                                                        >
+                                                            <CodeSlashIcon size={16} />
+                                                        </button>
+
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: profile.id, name: profile.name }) }}
+                                                            className="p-2 hover:bg-red-500/10 rounded-lg text-secondary hover:text-red-500 transition-all hover-lift"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
                                                     </div>
-
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setEditingProfile(profile.id) }}
-                                                        className="p-2 hover:bg-blue-500/10 rounded-lg text-zinc-400 hover:text-blue-400 transition-all hover:scale-105"
-                                                        title="Edit Config"
-                                                    >
-                                                        <Edit size={16} />
-                                                    </button>
-
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setJsonEditingProfile(profile) }}
-                                                        className="p-2 hover:bg-purple-500/10 rounded-lg text-zinc-400 hover:text-purple-400 transition-all hover:scale-105"
-                                                        title="Edit as JSON"
-                                                    >
-                                                        <CodeSlashIcon size={16} />
-                                                    </button>
-
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: profile.id, name: profile.name }) }}
-                                                        className="p-2 hover:bg-red-500/10 rounded-lg text-secondary hover:text-red-500 transition-all hover-lift"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )
-                                })}
+                                        )
+                                    })}
                             </div>
                         )}
                     </div>
