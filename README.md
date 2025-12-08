@@ -61,7 +61,7 @@ Contributions are welcome! Please submit a Pull Request or open an Issue if you 
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 
 ---
 <div align="center">
