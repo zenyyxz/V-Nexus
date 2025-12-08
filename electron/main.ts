@@ -1,11 +1,13 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron'
 import { exec, spawn } from 'child_process'
 import path from 'path'
+import fs from 'fs'
+import * as net from 'net'
+import * as dns from 'dns'
 import { startXray, killXray } from './core-manager'
 import { enableSystemProxy, disableSystemProxy } from './system-proxy'
 import { killSwitch } from './killswitch'
 import { updater } from './auto-updater'
-import * as net from 'net'
 
 let tray: Tray | null = null
 let mainWindow: BrowserWindow | null = null
@@ -129,24 +131,16 @@ const createWindow = () => {
         titleBarStyle: 'hidden',
         backgroundColor: '#09090b', // Match app background (dark theme)
         icon: getIconPath(),
-        resizable: false // Enforce fixed size as per user request (and greyed restore button implication)
+        resizable: false // Enforce fixed size per user request
     })
 
-    // Hide instead of close
-    mainWindow.on('close', (event) => {
-        if (!isQuitting) {
-            event.preventDefault()
-            mainWindow?.hide()
-            return false
-        }
-    })
+    updater.setMainWindow(mainWindow)
 
-    // Load Index
+    // Robust Path Checking for ASAR
     if (process.env.NODE_ENV === 'development') {
         mainWindow.loadURL('http://localhost:5173')
         mainWindow.webContents.openDevTools()
     } else {
-        // Robust Path Checking for ASAR
         const appPath = app.getAppPath()
         const indexPath = path.join(appPath, 'dist/index.html')
 
@@ -163,12 +157,7 @@ const createWindow = () => {
                 dialog.showErrorBox('Startup Error', `Failed to load app from:\n${indexPath}\n\nFallback error: ${e2.message}`)
             })
         })
-
-        // Disable DevTools in production
-        // mainWindow.webContents.openDevTools() 
     }
-
-    updater.setMainWindow(mainWindow)
 
     // Auto-check for updates on startup (only in production)
     if (process.env.NODE_ENV !== 'development') {
@@ -203,8 +192,6 @@ ipcMain.handle('xray:start', async (_, profileData: any, settingsData: any) => {
         console.log('Starting Xray with profile:', profileData)
         console.log('Using settings:', settingsData)
 
-        const { tunManager } = await import('./tun_manager')
-
         // Force correct ports (Standard defaults)
         settingsData.socksPort = 10808
         settingsData.httpPort = 10809
@@ -216,14 +203,30 @@ ipcMain.handle('xray:start', async (_, profileData: any, settingsData: any) => {
 
         startXray(configPath)
 
+        // Resolve Domain to IP (Critical for TUN Mode and Kill Switch)
+        let serverIp = profileData.address
+        if (!net.isIP(serverIp)) {
+            console.log(`Resolving domain: ${serverIp}`)
+            try {
+                // Use dns.promises for async lookup
+                const { address } = await dns.promises.lookup(serverIp)
+                serverIp = address
+                console.log(`Resolved to IP: ${serverIp}`)
+            } catch (e) {
+                console.error('DNS Resolution failed:', e)
+            }
+        }
+
         // 2. Mode Specific Setup
         if (settingsData.tunMode) {
             // ===== TUN MODE: Xray + Tun2Socks =====
             console.log('TUN Mode enabled - Starting TunManager...')
 
+            const { tunManager } = await import('./tun_manager')
+
             // Xray acts as the socks proxy
             await tunManager.start(null, {
-                serverIp: profileData.address,
+                serverIp: serverIp, // Use Resolved IP
                 proxyPort: settingsData.socksPort,
                 dnsServers: ['1.1.1.1', '1.0.0.1']
             })
@@ -238,10 +241,7 @@ ipcMain.handle('xray:start', async (_, profileData: any, settingsData: any) => {
             }
         }
 
-        // Get server IP for kill switch
-        const serverIp = profileData.address
-
-        // Enable kill switch if configured
+        // Enable kill switch if configured (using Resolved IP)
         if (settingsData.killSwitch) {
             const result = await killSwitch.enable(serverIp)
             if (!result.success) {
@@ -268,14 +268,10 @@ ipcMain.handle('xray:stop', async () => {
         const { tunManager } = await import('./tun_manager')
 
         // Stop TUN if running
-        // Note: We might need the Server IP to clean specific routes?
-        // For now, TunManager.stop() cleans what it can. 
-        // Ideally we should track the active server IP in state, but TunManager handles general cleanup.
         await tunManager.stop()
 
         // Stop Xray
         killXray()
-        // We removed killSingBox() call as we don't use it anymore
 
         await disableSystemProxy()
 
@@ -387,7 +383,6 @@ ipcMain.handle('system:set-launch-on-startup', async (_, enabled: boolean) => {
 })
 
 // Get Xray stats (traffic data)
-// Note: Xray needs to be configured with stats API enabled
 ipcMain.handle('xray:stats', async () => {
     try {
         const { getXrayStats } = await import('./core-manager')
@@ -398,7 +393,6 @@ ipcMain.handle('xray:stats', async () => {
     }
 })
 
-// Clean up on exit
 // Fetch URL content (bypass CORS)
 ipcMain.handle('utils:fetch', async (_, url: string) => {
     try {
@@ -422,17 +416,71 @@ ipcMain.handle('system:check-admin', async () => {
     })
 })
 
+// Get App Version
+ipcMain.handle('system:get-version', () => {
+    return app.getVersion()
+})
+
 // Restart as Admin
 ipcMain.handle('system:restart-as-admin', async () => {
+    // DEV MODE CHECK
     if (process.env.NODE_ENV === 'development') {
-        return { success: false, error: 'Cannot auto-restart in Development mode. Please restart your terminal as Administrator.' }
+        const devMsg = 'Cannot auto-restart in Development mode. Please restart your terminal as Administrator.'
+        console.error(devMsg)
+        return { success: false, error: devMsg }
     }
 
-    const appPath = app.getPath('exe')
-    console.log('Restarting as Admin:', appPath)
-    spawn('powershell', ['Start-Process', `"${appPath}"`, '-Verb', 'RunAs'], { detached: true })
-    app.quit()
-    return { success: true }
+    try {
+        const appPath = app.getPath('exe')
+        const workingDir = path.dirname(appPath)
+
+        console.log('Restarting as Admin (VBS Strategy):', appPath)
+
+        // VBScript Content
+        const vbsPath = path.join(app.getPath('temp'), 'v-nexus-restart.vbs')
+
+        // Escape paths for VBScript: Replace " with ""
+        const safeAppPath = appPath.replace(/"/g, '""')
+        const safeWorkingDir = workingDir.replace(/"/g, '""')
+
+        const vbsContent = [
+            'Set UAC = CreateObject("Shell.Application")',
+            `UAC.ShellExecute "${safeAppPath}", "", "${safeWorkingDir}", "runas", 1`
+        ].join('\r\n')
+
+        // Write VBS file synchronously
+        try {
+            fs.writeFileSync(vbsPath, vbsContent)
+        } catch (writeErr: any) {
+            console.error('Failed to write VBS file:', writeErr)
+            throw new Error(`Failed to create restart script: ${writeErr.message}`)
+        }
+
+        // Spawn wscript (Windows Script Host) to run the VBS
+        const child = spawn('wscript', [vbsPath], {
+            detached: true,
+            stdio: 'ignore'
+        })
+
+        child.on('error', (err) => {
+            console.error('Failed to spawn wscript:', err)
+            dialog.showErrorBox('Restart Failed', `Failed to execute restart script:\n${err.message}`)
+        })
+
+        child.unref()
+
+        // Give it a moment to trigger UAC, then quit
+        // We do not wait for the child because it's detached
+        setTimeout(() => {
+            app.quit()
+        }, 1000)
+
+        return { success: true }
+    } catch (e: any) {
+        console.error('Restart Exception:', e)
+        dialog.showErrorBox('Restart Error', `An error occurred during restart:\n${e.message}`)
+        return { success: false, error: e.message }
+    }
 })
 
 // Window Controls Handlers
@@ -441,11 +489,7 @@ ipcMain.handle('window:minimize', () => {
 })
 
 ipcMain.handle('window:close', () => {
-    if (!isQuitting) {
-        mainWindow?.hide()
-    } else {
-        mainWindow?.close()
-    }
+    app.quit()
 })
 
 app.on('before-quit', async (_event) => {

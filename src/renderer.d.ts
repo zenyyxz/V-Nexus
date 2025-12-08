@@ -11,6 +11,7 @@ export interface SystemAPI {
     setLaunchOnStartup: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
     checkAdmin: () => Promise<{ success: boolean; isAdmin: boolean }>
     restartAsAdmin: () => Promise<{ success: boolean; error?: string }>
+    getVersion: () => Promise<string>
 }
 
 export interface XrayAPI {

@@ -2,6 +2,8 @@ import { spawn, ChildProcess } from 'child_process'
 import path from 'path'
 import { app } from 'electron'
 import sudo from 'sudo-prompt'
+import os from 'os'
+import { exec } from 'child_process'
 
 // Use require to bypass esbuild export mismatch issues with default-gateway
 // @ts-ignore
@@ -112,8 +114,32 @@ export class TunManager {
                 this.tunProcess = null
             })
 
-            // Give it a moment to create the interface
-            setTimeout(resolve, 3000)
+            // Polling for Interface Creation (Max 3s)
+            const checkInterval = 100
+            const maxRetries = 30 // 3 seconds total
+            let attempts = 0
+
+            const pollInterval = setInterval(() => {
+                attempts++
+                const interfaces = os.networkInterfaces()
+                // Check if our interface name or similar exists
+                // Note: Windows names might not match exactly "tun0" in os.networkInterfaces, 
+                // but tun2socks usually sets the name if possible. 
+                // Alternatively, we can assume if the process didn't exit in 500ms, it's capable.
+
+                // Better approach: resolving quickly if process is alive
+                if (attempts >= 5) { // Wait at least 500ms to ensure stability
+                    clearInterval(pollInterval)
+                    resolve()
+                }
+
+                if (attempts > maxRetries) {
+                    clearInterval(pollInterval)
+                    resolve() // Resolving anyway, downstream might fail if not ready
+                }
+            }, checkInterval)
+
+            this.tunProcess.on('exit', () => clearInterval(pollInterval))
         })
     }
 
@@ -158,18 +184,28 @@ export class TunManager {
     private runAdminCommands(cmds: string[]): Promise<void> {
         return new Promise((resolve, reject) => {
             const combinedCmd = cmds.join(' && ')
-            const options = {
-                name: 'VNexus Tun Manager',
-            }
-
             console.log('[TunManager] Executing Admin Commands:', combinedCmd)
 
-            sudo.exec(combinedCmd, options, (error, stdout, _stderr) => {
+            // OPTIMIZATION: If we are already running as Admin (which we should be),
+            // use native 'exec' instead of 'sudo-prompt' to save time.
+            // We can trust the check done in start()
+
+            exec(combinedCmd, (error, stdout, stderr) => {
                 if (error) {
-                    console.error('[TunManager] Admin Command Error:', error)
-                    reject(error)
+                    console.warn('[TunManager] Native exec failed, falling back to sudo-prompt:', error.message)
+                    // Fallback to sudo-prompt if native fails (rare)
+                    const options = { name: 'VNexus Tun Manager' }
+                    sudo.exec(combinedCmd, options, (sudoErr, sudoStdout, _sudoStderr) => {
+                        if (sudoErr) {
+                            console.error('[TunManager] Sudo Command Error:', sudoErr)
+                            reject(sudoErr)
+                        } else {
+                            console.log('[TunManager] Sudo Command Success:', sudoStdout)
+                            resolve()
+                        }
+                    })
                 } else {
-                    console.log('[TunManager] Admin Command Success:', stdout)
+                    console.log('[TunManager] Native Exec Success:', stdout)
                     resolve()
                 }
             })

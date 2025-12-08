@@ -45,12 +45,15 @@
         "autoprefixer": "^10.4.22",
         "concurrently": "^8.2.2",
         "cross-env": "^7.0.3",
+        "electron": "^39.2.6",
         "electron-builder": "^24.13.3",
         "postcss": "^8.4.35",
         "tailwindcss": "^3.4.1",
         "vite": "^5.1.4",
         "wait-on": "^7.2.0"
     },
+    "author": "Lahiru Rashmika",
+    "description": "V-Nexus V2Ray Client",
     "build": {
         "files": [
             "dist/**/*",
@@ -69,7 +72,7 @@
         },
         "win": {
             "icon": "resources/icon.png",
-            "requestedExecutionLevel": "requireAdministrator"
+            "requestedExecutionLevel": "asInvoker"
         },
         "compression": "maximum",
         "asar": true,

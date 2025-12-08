@@ -18,6 +18,7 @@ import { useReconnect } from './hooks/useReconnect'
 
 import { useHealthCheck } from './hooks/useHealthCheck'
 import { TitleBar } from './components/TitleBar'
+import { AdminPrivilegeBanner } from './components/AdminPrivilegeBanner'
 
 function AnimatedRoutes() {
     const location = useLocation()
@@ -49,6 +50,8 @@ const PageTransition = ({ children }: { children: React.ReactNode }) => (
 
 function App() {
     const [isSidebarOpen, setSidebarOpen] = useState(true)
+    const [isAdmin, setIsAdmin] = useState(false)
+    const [appVersion, setAppVersion] = useState('')
     const { settings } = useApp()
 
     // Auto-check for updates on startup
@@ -64,6 +67,33 @@ function App() {
         installUpdate,
         dismissUpdate
     } = useUpdateChecker(true)
+
+    // Check admin status and version on mount
+    useEffect(() => {
+        const init = async () => {
+            try {
+                const result = await window.system.checkAdmin()
+                setIsAdmin(result.isAdmin)
+
+                const ver = await window.system.getVersion()
+                setAppVersion(ver)
+            } catch (error) {
+                console.error('Failed to init system info:', error)
+            }
+        }
+        init()
+    }, [])
+
+    const handleRestartAsAdmin = async () => {
+        try {
+            const result = await window.system.restartAsAdmin()
+            if (result && !result.success) {
+                console.error('Failed to restart as admin:', result.error)
+            }
+        } catch (error) {
+            console.error('Failed to restart as admin (exception):', error)
+        }
+    }
 
     // Apply theme to document root
     useEffect(() => {
@@ -93,6 +123,11 @@ function App() {
         <Router>
             <ErrorRecovery />
             <CommandPalette />
+
+            {/* Admin Privilege Banner - Only show if TUN mode is enabled and not admin */}
+            {!isAdmin && settings.tunMode && (
+                <AdminPrivilegeBanner onRestartAsAdmin={handleRestartAsAdmin} />
+            )}
 
             {/* Update Notification Banner */}
             {updateAvailable && !dismissed && (
@@ -160,7 +195,7 @@ function App() {
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-xs font-medium text-primary">V-Nexus</span>
-                                    <span className="text-[10px] text-secondary">v2.0.0</span>
+                                    <span className="text-[10px] text-secondary">v{appVersion}</span>
                                 </div>
                             </div>
                         ) : (

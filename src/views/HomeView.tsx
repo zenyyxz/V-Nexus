@@ -70,13 +70,15 @@ export const HomeView = () => {
     const [pingingAll, setPingingAll] = useState(false)
     const [copiedIp, setCopiedIp] = useState(false)
 
+    const [isTransitioning, setIsTransitioning] = useState(false)
+
     // Keyboard shortcuts
     useKeyboardShortcuts([
         {
             key: 'd',
             ctrl: true,
             action: () => {
-                if (isConnected) {
+                if (isConnected && !isTransitioning) {
                     handleConnect() // Will disconnect if already connected
                 }
             },
@@ -86,7 +88,7 @@ export const HomeView = () => {
             key: 'r',
             ctrl: true,
             action: () => {
-                if (!isConnected && (activeProfileId || selectedProfileId)) {
+                if (!isConnected && (activeProfileId || selectedProfileId) && !isTransitioning) {
                     handleConnect() // Reconnect
                 }
             },
@@ -149,6 +151,7 @@ export const HomeView = () => {
             if (hasAutoConnected || isConnected || !settings.connectOnBoot || settings.autoConnect === 'none' || profiles.length === 0) return
 
             sessionStorage.setItem('hasAutoConnected', 'true')
+            setIsTransitioning(true) // Indicate starting
 
             // Wait a bit for latency checks if auto-fastest is on
             if (settings.autoSelectFastest) {
@@ -166,57 +169,64 @@ export const HomeView = () => {
                 const profile = profiles.find(p => p.id === targetId)
                 if (profile) {
                     showToast(`Auto-connecting to ${profile.name}...`, 'info')
-                    const result = await window.xray.start(profile, settings)
-                    if (result.success) {
-                        setConnected(true)
-                        setActiveProfile(profile.id)
-                        window.electronApp?.sendConnectionStatus(true)
-                        showToast(`Connected to ${profile.name}`, 'success')
+                    try {
+                        const result = await window.xray.start(profile, settings)
+                        if (result.success) {
+                            setConnected(true)
+                            setActiveProfile(profile.id)
+                            window.electronApp?.sendConnectionStatus(true)
+                            showToast(`Connected to ${profile.name}`, 'success')
 
-                        // Resolve IP for stats
-                        try {
-                            const response = await fetch(`https://dns.google/resolve?name=${profile.address}&type=A`)
-                            const data = await response.json()
-                            if (data.Answer && data.Answer.length > 0) {
-                                const serverIp = data.Answer[0].data
-                                updateSessionStats({
-                                    connectedIp: serverIp,
-                                    connectedRegion: detectRegionFromAddress(profile.address),
-                                    uploaded: 0,
-                                    downloaded: 0
-                                })
-                            }
-                        } catch (e) { console.error(e) }
-
-                        // Test latency on connected if enabled
-                        if (settings.testLatencyOnConnected) {
-                            setTimeout(async () => {
-                                try {
-                                    const { pingServer } = await import('../utils/ping')
-                                    const latency = await pingServer(profile.address, profile.port, settings.latencyTestMethod)
-                                    updateProfile(profile.id, { latency })
-                                    if (latency < 9999) {
-                                        showToast(`Latency: ${latency}ms`, 'success', 2000)
-                                    }
-                                } catch (error) {
-                                    console.error('Failed to test latency on connect:', error)
+                            // Resolve IP for stats
+                            try {
+                                const response = await fetch(`https://dns.google/resolve?name=${profile.address}&type=A`)
+                                const data = await response.json()
+                                if (data.Answer && data.Answer.length > 0) {
+                                    const serverIp = data.Answer[0].data
+                                    updateSessionStats({
+                                        connectedIp: serverIp,
+                                        connectedRegion: detectRegionFromAddress(profile.address),
+                                        uploaded: 0,
+                                        downloaded: 0
+                                    })
                                 }
-                            }, 1000) // Wait 1 second after connection
+                            } catch (e) { console.error(e) }
+
+                            // Test latency on connected if enabled
+                            if (settings.testLatencyOnConnected) {
+                                setTimeout(async () => {
+                                    try {
+                                        const { pingServer } = await import('../utils/ping')
+                                        const latency = await pingServer(profile.address, profile.port, settings.latencyTestMethod)
+                                        updateProfile(profile.id, { latency })
+                                        if (latency < 9999) {
+                                            showToast(`Latency: ${latency}ms`, 'success', 2000)
+                                        }
+                                    } catch (error) {
+                                        console.error('Failed to test latency on connect:', error)
+                                    }
+                                }, 1000) // Wait 1 second after connection
+                            }
                         }
-                    }
+                    } catch (e) { console.error(e) }
                 }
             }
+            setIsTransitioning(false)
         }
 
         checkAutoConnect()
     }, [profiles, settings.connectOnBoot, settings.autoConnect, isConnected])
 
     const handleConnect = async () => {
+        if (isTransitioning) return
+
+        setIsTransitioning(true)
+
         if (isConnected) {
             // Disconnect
             try {
                 markManualDisconnect() // Prevent auto-reconnect for manual disconnects
-                showToast('Disconnecting...', 'info')
+                // showToast('Disconnecting...', 'info') // Redundant with button state
                 const result = await window.xray.stop()
 
                 if (result.success) {
@@ -229,6 +239,8 @@ export const HomeView = () => {
                 }
             } catch (error: any) {
                 showToast(`Disconnect error: ${error.message}`, 'error')
+            } finally {
+                setIsTransitioning(false)
             }
             return
         }
@@ -246,11 +258,13 @@ export const HomeView = () => {
                 showToast(`Auto-selected fastest server: ${fastest.name} (${fastest.latency}ms)`, 'info')
             } else {
                 showToast('No servers with latency data. Please ping servers first.', 'warning')
+                setIsTransitioning(false)
                 return
             }
         } else {
             if (!selectedProfileId) {
                 showToast('Please select a profile to connect', 'warning')
+                setIsTransitioning(false)
                 return
             }
             profileId = selectedProfileId
@@ -258,11 +272,15 @@ export const HomeView = () => {
 
         if (!profileId) {
             showToast('No profile selected', 'warning')
+            setIsTransitioning(false)
             return
         }
 
         const profile = profiles.find(p => p.id === profileId)
-        if (!profile) return
+        if (!profile) {
+            setIsTransitioning(false)
+            return
+        }
 
         // TUN Mode Admin Check
         if (settings.tunMode) {
@@ -283,6 +301,7 @@ export const HomeView = () => {
                             }
                         }
                     )
+                    setIsTransitioning(false)
                     return
                 }
             } catch (e) {
@@ -293,7 +312,7 @@ export const HomeView = () => {
         }
 
         try {
-            showToast(`Connecting to ${profile.name}...`, 'info')
+            // showToast(`Connecting to ${profile.name}...`, 'info') // Redundant
             const result = await window.xray.start(profile, settings)
 
             if (result.success) {
@@ -343,6 +362,8 @@ export const HomeView = () => {
             }
         } catch (error: any) {
             showToast(`Connection error: ${error.message}`, 'error')
+        } finally {
+            setIsTransitioning(false)
         }
     }
 
@@ -406,14 +427,17 @@ export const HomeView = () => {
 
                     <button
                         onClick={handleConnect}
-                        disabled={!isConnected && profiles.length === 0}
+                        disabled={(!isConnected && profiles.length === 0) || isTransitioning}
                         className={`flex items-center gap-3 px-6 py-3 rounded-lg font-semibold text-sm transition-all shadow-lg hover-lift ${isConnected
                             ? 'bg-red-500 hover:bg-red-600 text-white'
                             : 'bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-50 disabled:cursor-not-allowed'
-                            }`}
+                            } ${isTransitioning ? 'cursor-wait opacity-80' : ''}`}
                     >
-                        <Power size={20} />
-                        {isConnected ? 'Disconnect' : 'Connect'}
+                        <Power size={20} className={isTransitioning ? 'animate-pulse' : ''} />
+                        {isConnected
+                            ? (isTransitioning ? 'Stopping...' : 'Disconnect')
+                            : (isTransitioning ? 'Starting...' : 'Connect')
+                        }
                     </button>
                 </div>
 

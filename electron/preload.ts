@@ -16,7 +16,8 @@ contextBridge.exposeInMainWorld('system', {
     getLaunchOnStartup: () => ipcRenderer.invoke('system:get-launch-on-startup'),
     setLaunchOnStartup: (enabled: boolean) => ipcRenderer.invoke('system:set-launch-on-startup', enabled),
     checkAdmin: () => ipcRenderer.invoke('system:check-admin'),
-    restartAsAdmin: () => ipcRenderer.invoke('system:restart-as-admin')
+    restartAsAdmin: () => ipcRenderer.invoke('system:restart-as-admin'),
+    getVersion: () => ipcRenderer.invoke('system:get-version')
 })
 
 contextBridge.exposeInMainWorld('utils', {
