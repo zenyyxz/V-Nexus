@@ -15,7 +15,9 @@ import { useApp } from './contexts/AppContext'
 import { useUpdateChecker } from './hooks/useUpdateChecker'
 import { useTranslation } from './hooks/useTranslation'
 import { useReconnect } from './hooks/useReconnect'
+
 import { useHealthCheck } from './hooks/useHealthCheck'
+import { TitleBar } from './components/TitleBar'
 
 function AnimatedRoutes() {
     const location = useLocation()
@@ -107,8 +109,8 @@ function App() {
             )}
 
             <div className="flex h-screen w-screen bg-background text-primary overflow-hidden font-sans selection:bg-accent selection:text-white">
-                {/* Titlebar Drag Region */}
-                <div className="absolute top-0 left-0 w-full h-8 app-region-drag z-50"></div>
+                {/* Titlebar */}
+                <TitleBar />
 
                 {/* Sidebar */}
                 <motion.aside

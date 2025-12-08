@@ -7,7 +7,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- Noto Color Emoji for proper flag rendering on Windows -->
   <link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap" rel="stylesheet">
-  <title>V2Ray Client</title>
+  <title>V-Nexus</title>
+  <script>
+    window.onerror = function (msg, url, lineNo, columnNo, error) {
+      const div = document.createElement('div');
+      div.style.color = 'red';
+      div.style.position = 'absolute';
+      div.style.top = '0';
+      div.style.left = '0';
+      div.style.background = 'white';
+      div.style.zIndex = '9999';
+      div.style.fontSize = '24px';
+      div.style.padding = '20px';
+      div.innerText = 'Error: ' + msg + '\n' + url + ':' + lineNo;
+      document.body.appendChild(div);
+      return false;
+    };
+  </script>
 </head>
 
 <body>

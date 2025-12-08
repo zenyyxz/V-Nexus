@@ -165,6 +165,9 @@ export interface AppContextType extends AppState {
     updateSessionStats: (stats: Partial<AppState['sessionStats']>) => void
     addTrafficDataPoint: (dataPoint: TrafficDataPoint) => void
     clearTrafficData: () => void
+    addSubscription: (sub: Subscription) => void
+    removeSubscription: (id: string) => void
+    updateSubscription: (id: string, updates: Partial<Subscription>) => void
 }
 
 const defaultSettings: AppSettings = {

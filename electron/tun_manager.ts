@@ -8,7 +8,7 @@ import sudo from 'sudo-prompt'
 const defaultGateway = require('default-gateway')
 
 const RESOURCES_PATH = app.isPackaged
-    ? path.join(process.resourcesPath, 'resources')
+    ? process.resourcesPath
     : path.join(process.cwd(), 'resources')
 
 const TUN2SOCKS_PATH = path.join(RESOURCES_PATH, 'tun2socks', 'tun2socks-windows-amd64.exe')

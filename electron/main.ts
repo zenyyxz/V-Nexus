@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron'
 import { exec, spawn } from 'child_process'
 import path from 'path'
 import { startXray, killXray } from './core-manager'
@@ -107,7 +107,6 @@ const createTray = () => {
     // Listen for connection status updates from renderer
     ipcMain.on('connection-status', (_event, isConnected) => {
         updateContextMenu(isConnected)
-        // Optionally update icon here (e.g. green icon)
     })
 }
 
@@ -121,13 +120,16 @@ const createWindow = () => {
         maxWidth: 1000,
         maxHeight: 700,
         frame: false, // Custom titlebar
-        show: false, // Don't show until ready
+        show: true, // Force show for debugging
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
+            // Allow loading local resources if needed
+            webSecurity: true
         },
         titleBarStyle: 'hidden',
         backgroundColor: '#09090b', // Match app background (dark theme)
-        icon: getIconPath()
+        icon: getIconPath(),
+        resizable: false // Enforce fixed size as per user request (and greyed restore button implication)
     })
 
     // Hide instead of close
@@ -139,26 +141,33 @@ const createWindow = () => {
         }
     })
 
-    // Show window when ready to prevent black screen
-    mainWindow.once('ready-to-show', () => {
-        mainWindow?.show()
-    })
-
-    // and load the index.html of the app.
-    // and load the index.html of the app.
+    // Load Index
     if (process.env.NODE_ENV === 'development') {
         mainWindow.loadURL('http://localhost:5173')
         mainWindow.webContents.openDevTools()
     } else {
-        const indexPath = path.join(__dirname, '../dist/index.html')
-        console.log('Loading Production Index:', indexPath)
+        // Robust Path Checking for ASAR
+        const appPath = app.getAppPath()
+        const indexPath = path.join(appPath, 'dist/index.html')
+
+        console.log('App Path:', appPath)
+        console.log('Target Index Path:', indexPath)
 
         mainWindow.loadFile(indexPath).catch(e => {
-            console.error('Failed to load index.html:', e)
+            console.error('Failed to load primary path:', indexPath)
+            console.error('Error:', e)
+
+            // Fallback
+            console.log('Attempting fallback load: dist/index.html')
+            mainWindow?.loadFile('dist/index.html').catch(e2 => {
+                dialog.showErrorBox('Startup Error', `Failed to load app from:\n${indexPath}\n\nFallback error: ${e2.message}`)
+            })
         })
+
+        // Disable DevTools in production
+        // mainWindow.webContents.openDevTools() 
     }
 
-    // Initialize auto-updater with main window
     updater.setMainWindow(mainWindow)
 
     // Auto-check for updates on startup (only in production)
@@ -169,17 +178,12 @@ const createWindow = () => {
     }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+// App Life Cycle
 app.on('ready', () => {
     createWindow()
     createTray()
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         // Do nothing if tray is active, rely on explicit quit
@@ -188,8 +192,6 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-    // On OS X it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) {
         createWindow()
     }
@@ -411,21 +413,6 @@ ipcMain.handle('utils:fetch', async (_, url: string) => {
     }
 })
 
-// Clean up on exit
-app.on('before-quit', async (_event) => {
-    // Prevent default to allow async cleanup if needed, but here we just block
-    isQuitting = true
-    console.log('App is quitting, cleaning up...')
-
-    try {
-        killXray()
-        await disableSystemProxy()
-        await killSwitch.disable()
-    } catch (e) {
-        console.error('Cleanup failed:', e)
-    }
-})
-
 // Check if running as Admin
 ipcMain.handle('system:check-admin', async () => {
     return new Promise((resolve) => {
@@ -442,17 +429,33 @@ ipcMain.handle('system:restart-as-admin', async () => {
     }
 
     const appPath = app.getPath('exe')
-    // In dev, appPath is electron.exe, we need to handle that or just try best effort
-    // For production, this works perfectly.
     console.log('Restarting as Admin:', appPath)
-
-    // Spawn PowerShell to start the process with RunAs verb (Admin)
     spawn('powershell', ['Start-Process', `"${appPath}"`, '-Verb', 'RunAs'], { detached: true })
-
-    // Quit current instance
     app.quit()
     return { success: true }
 })
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
+// Window Controls Handlers
+ipcMain.handle('window:minimize', () => {
+    mainWindow?.minimize()
+})
+
+ipcMain.handle('window:close', () => {
+    if (!isQuitting) {
+        mainWindow?.hide()
+    } else {
+        mainWindow?.close()
+    }
+})
+
+app.on('before-quit', async (_event) => {
+    isQuitting = true
+    console.log('App is quitting, cleaning up...')
+    try {
+        killXray()
+        await disableSystemProxy()
+        await killSwitch.disable()
+    } catch (e) {
+        console.error('Cleanup failed:', e)
+    }
+})

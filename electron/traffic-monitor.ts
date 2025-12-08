@@ -117,9 +117,4 @@ export function stopTrafficMonitoring(): void {
     resetTrafficStats()
 }
 
-/**
- * Parse Xray log (not used for stats)
- */
-export function parseXrayLog(_logLine: string): void {
-    // Not used - we get stats from API
-}
+// End of file

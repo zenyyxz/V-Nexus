@@ -103,8 +103,8 @@ export function startXray(configPath: string): void {
             if (output && !output.includes('socks-in -> direct') && !output.includes('127.0.0.1:0')) {
                 addLog('INFO', output)
                 // Parse for traffic stats
-                import('./traffic-monitor').then(({ parseXrayLog }) => {
-                    parseXrayLog(output)
+                import('./traffic-monitor').then(() => {
+                    // Stats are handled via API now
                 })
             }
         })
@@ -116,8 +116,8 @@ export function startXray(configPath: string): void {
             if (output && !output.includes('socks-in -> direct')) {
                 addLog('ERROR', output)
                 // Parse for traffic stats
-                import('./traffic-monitor').then(({ parseXrayLog }) => {
-                    parseXrayLog(output)
+                import('./traffic-monitor').then(() => {
+                    // Stats are handled via API now
                 })
             }
         })
