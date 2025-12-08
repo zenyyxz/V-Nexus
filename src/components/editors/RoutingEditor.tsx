@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Save, Plus, X } from 'lucide-react'
 
 export const RoutingEditor = () => {
-    const [rules, setRules] = useState([
+    const [rules] = useState([
         { id: 1, type: 'field', outoundTag: 'block', domain: ['geosite:category-ads-all'] },
         { id: 2, type: 'field', outoundTag: 'proxy', domain: ['geosite:google'] },
         { id: 3, type: 'field', outoundTag: 'direct', domain: ['geosite:cn'] },
@@ -32,8 +32,8 @@ export const RoutingEditor = () => {
                         <div className="flex-1 grid grid-cols-12 gap-4 items-center">
                             <div className="col-span-2">
                                 <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${rule.outoundTag === 'block' ? 'bg-red-500/10 text-red-500' :
-                                        rule.outoundTag === 'proxy' ? 'bg-purple-500/10 text-purple-500' :
-                                            'bg-emerald-500/10 text-emerald-500'
+                                    rule.outoundTag === 'proxy' ? 'bg-purple-500/10 text-purple-500' :
+                                        'bg-emerald-500/10 text-emerald-500'
                                     }`}>
                                     {rule.outoundTag}
                                 </span>

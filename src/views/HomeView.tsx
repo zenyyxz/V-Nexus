@@ -264,6 +264,34 @@ export const HomeView = () => {
         const profile = profiles.find(p => p.id === profileId)
         if (!profile) return
 
+        // TUN Mode Admin Check
+        if (settings.tunMode) {
+            try {
+                const adminCheck = await window.system.checkAdmin()
+                if (!adminCheck.isAdmin) {
+                    showToast(
+                        'TUN Mode requires Administrator privileges.',
+                        'error',
+                        10000,
+                        {
+                            label: 'Restart as Admin',
+                            onClick: async () => {
+                                const result = await window.system.restartAsAdmin()
+                                if (!result.success && result.error) {
+                                    showToast(result.error, 'error', 5000)
+                                }
+                            }
+                        }
+                    )
+                    return
+                }
+            } catch (e) {
+                console.error('Failed to check admin status:', e)
+                // Proceed or warn? Let's warn but proceed in case check fails but user is actually admin
+                showToast('Warning: Could not verify Administrator privileges.', 'warning')
+            }
+        }
+
         try {
             showToast(`Connecting to ${profile.name}...`, 'info')
             const result = await window.xray.start(profile, settings)
@@ -442,16 +470,13 @@ export const HomeView = () => {
                                 <div className="mb-1">
                                     <span className="text-3xl" style={{ fontFamily: '"Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif' }}>{getCountryFlag(sessionStats?.connectedRegion || '')}</span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="font-mono text-sm font-semibold text-purple-500 truncate flex-1">{sessionStats.connectedIp}</div>
-                                        <button
-                                            onClick={handleCopyIp}
-                                            className="p-1.5 hover:bg-purple-500/10 rounded transition-colors text-purple-400 hover:text-purple-300"
-                                        >
-                                            {copiedIp ? <Check size={14} /> : <Copy size={14} />}
-                                        </button>
-                                    </div>
+                                <div
+                                    onClick={handleCopyIp}
+                                    className="group font-mono text-sm font-semibold text-purple-500 truncate cursor-pointer hover:text-purple-400 transition-colors w-full flex items-center gap-2"
+                                    title="Click to copy"
+                                >
+                                    <span className="truncate">{sessionStats.connectedIp}</span>
+                                    {copiedIp ? <Check size={12} className="flex-shrink-0" /> : <Copy size={12} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />}
                                 </div>
                             </>
                         ) : (

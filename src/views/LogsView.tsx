@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from '../hooks/useTranslation'
 import { useApp } from '../contexts/AppContext'
-import { FileText, Download, Trash2 } from 'lucide-react'
+import { FileText, Download, Trash2, ArrowDownCircle } from 'lucide-react'
 
 export const LogsView = () => {
     const { settings } = useApp()
     const { t } = useTranslation()
     const [logs, setLogs] = useState<string[]>([])
     const [autoRefresh, setAutoRefresh] = useState(true)
+    const logsEndRef = useRef<HTMLDivElement>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
+    const [userScrolled, setUserScrolled] = useState(false)
 
     // Fetch logs from Xray
     const fetchLogs = async () => {
@@ -31,6 +34,28 @@ export const LogsView = () => {
             return () => clearInterval(interval)
         }
     }, [autoRefresh])
+
+    // Auto-scroll logic
+    useEffect(() => {
+        if (!userScrolled && logsEndRef.current) {
+            logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+        }
+    }, [logs, userScrolled])
+
+    // Detect user scroll
+    const handleScroll = () => {
+        if (containerRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = containerRef.current
+            // If user is near bottom (within 50px), enable auto-scroll. Otherwise disable.
+            const isNearBottom = scrollHeight - scrollTop - clientHeight < 50
+            setUserScrolled(!isNearBottom)
+        }
+    }
+
+    const scrollToBottom = () => {
+        setUserScrolled(false)
+        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
 
     const handleExport = () => {
         const logText = logs.join('\n')
@@ -66,12 +91,12 @@ export const LogsView = () => {
                         </div>
                     </div>
                     <div className="flex gap-2 items-center">
-                        <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer">
+                        <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer select-none">
                             <input
                                 type="checkbox"
                                 checked={autoRefresh}
                                 onChange={(e) => setAutoRefresh(e.target.checked)}
-                                className="rounded border-border bg-background"
+                                className="rounded border-border bg-background accent-accent"
                             />
                             {t('logs_auto_refresh')}
                         </label>
@@ -93,13 +118,17 @@ export const LogsView = () => {
                 </div>
             </header>
 
-            <div className="flex-1 bg-surface border border-border rounded-2xl overflow-hidden flex flex-col mx-6 mb-6">
+            <div className="flex-1 bg-surface border border-border rounded-2xl overflow-hidden flex flex-col mx-6 mb-6 relative">
                 <div className="p-4 border-b border-border bg-background/50 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-primary">{t('logs_app_logs')}</h3>
                     <span className="text-xs text-secondary">{logs.length} {t('logs_entries')}</span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-5 font-mono text-sm leading-relaxed">
+                <div
+                    ref={containerRef}
+                    onScroll={handleScroll}
+                    className="flex-1 overflow-y-auto p-5 font-mono text-sm leading-relaxed"
+                >
                     {logs.length === 0 ? (
                         <div className="text-center text-secondary py-12">
                             <FileText size={48} className="mx-auto mb-4 opacity-30" />
@@ -108,13 +137,25 @@ export const LogsView = () => {
                     ) : (
                         <div className="space-y-0.5">
                             {logs.map((log, index) => (
-                                <div key={index} className="text-zinc-300 hover:bg-zinc-800/30 px-2 py-1 rounded transition-colors">
+                                <div key={index} className="text-zinc-300 hover:bg-zinc-800/30 px-2 py-1 rounded transition-colors break-words">
                                     {log}
                                 </div>
                             ))}
+                            <div ref={logsEndRef} />
                         </div>
                     )}
                 </div>
+
+                {/* Scroll to bottom button if user scrolled up */}
+                {userScrolled && logs.length > 0 && (
+                    <button
+                        onClick={scrollToBottom}
+                        className="absolute bottom-6 right-6 p-2 bg-accent text-white rounded-full shadow-lg hover:bg-accent/90 transition-all hover:scale-110 animate-fade-in"
+                        title="Scroll to Bottom"
+                    >
+                        <ArrowDownCircle size={24} />
+                    </button>
+                )}
             </div>
         </div>
     )

@@ -367,10 +367,10 @@ export const ConfigsView = () => {
                                         return (
                                             <div
                                                 key={profile.id}
-                                                className="group relative bg-black/80 backdrop-blur-sm border border-zinc-800/50 rounded-xl p-4 hover:border-zinc-700/50 hover:bg-black/90 transition-all duration-200 animate-fade-in overflow-hidden"
+                                                className={`group relative bg-black/80 backdrop-blur-sm border border-zinc-800/50 rounded-xl p-4 hover:border-zinc-700/50 hover:bg-black/90 transition-all duration-200 animate-fade-in ${shareMenuOpen === profile.id ? 'z-20' : ''}`}
                                             >
                                                 {/* Subtle gradient overlay on hover */}
-                                                <div className="absolute inset-0 bg-gradient-to-r from-accent/0 via-accent/5 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                                                <div className="absolute inset-0 bg-gradient-to-r from-accent/0 via-accent/5 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-xl" />
 
                                                 <div className="relative flex items-start justify-between gap-4">
                                                     <div className="flex-1 min-w-0 space-y-2.5">

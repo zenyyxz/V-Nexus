@@ -9,10 +9,14 @@ interface Toast {
     type: ToastType
     message: string
     duration?: number
+    action?: {
+        label: string
+        onClick: () => void
+    }
 }
 
 interface ToastContextType {
-    showToast: (message: string, type?: ToastType, duration?: number) => void
+    showToast: (message: string, type?: ToastType, duration?: number, action?: { label: string, onClick: () => void }) => void
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined)
@@ -20,9 +24,9 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined)
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [toasts, setToasts] = useState<Toast[]>([])
 
-    const showToast = useCallback((message: string, type: ToastType = 'info', duration: number = 3000) => {
+    const showToast = useCallback((message: string, type: ToastType = 'info', duration: number = 3000, action?: { label: string, onClick: () => void }) => {
         const id = crypto.randomUUID()
-        const toast: Toast = { id, type, message, duration }
+        const toast: Toast = { id, type, message, duration, action }
 
         setToasts(prev => [...prev, toast])
 
@@ -67,7 +71,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return (
         <ToastContext.Provider value={{ showToast }}>
             {children}
-            <div className="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none max-w-md">
+            <div className="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none max-w-md w-full">
                 <AnimatePresence>
                     {toasts.map(toast => (
                         <motion.div
@@ -89,10 +93,23 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             )}
 
                             {getIcon(toast.type)}
-                            <span className="text-sm font-medium text-zinc-100 flex-1">{toast.message}</span>
+                            <div className="flex-1 flex flex-col gap-1">
+                                <span className="text-sm font-medium text-zinc-100">{toast.message}</span>
+                                {toast.action && (
+                                    <button
+                                        onClick={() => {
+                                            toast.action?.onClick()
+                                            removeToast(toast.id)
+                                        }}
+                                        className="self-start px-3 py-1 mt-1 text-xs font-semibold bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-colors text-white"
+                                    >
+                                        {toast.action.label}
+                                    </button>
+                                )}
+                            </div>
                             <button
                                 onClick={() => removeToast(toast.id)}
-                                className="ml-2 text-zinc-400 hover:text-zinc-200 transition-colors"
+                                className="ml-2 text-zinc-400 hover:text-zinc-200 transition-colors self-start mt-0.5"
                             >
                                 <X size={16} />
                             </button>

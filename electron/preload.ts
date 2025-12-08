@@ -14,7 +14,13 @@ contextBridge.exposeInMainWorld('electron', {
 contextBridge.exposeInMainWorld('system', {
     getMemory: () => ipcRenderer.invoke('system:memory'),
     getLaunchOnStartup: () => ipcRenderer.invoke('system:get-launch-on-startup'),
-    setLaunchOnStartup: (enabled: boolean) => ipcRenderer.invoke('system:set-launch-on-startup', enabled)
+    setLaunchOnStartup: (enabled: boolean) => ipcRenderer.invoke('system:set-launch-on-startup', enabled),
+    checkAdmin: () => ipcRenderer.invoke('system:check-admin'),
+    restartAsAdmin: () => ipcRenderer.invoke('system:restart-as-admin')
+})
+
+contextBridge.exposeInMainWorld('utils', {
+    fetch: (url: string) => ipcRenderer.invoke('utils:fetch', url)
 })
 
 contextBridge.exposeInMainWorld('xray', {
@@ -48,6 +54,9 @@ declare global {
             getMemory: () => Promise<{ success: boolean; memory: number; error?: string }>
             getLaunchOnStartup: () => Promise<{ success: boolean; enabled: boolean; error?: string }>
             setLaunchOnStartup: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
+        }
+        utils: {
+            fetch: (url: string) => Promise<{ success: boolean; data: string; error?: string }>
         }
         xray: {
             start: (profileData: any, settingsData: any) => Promise<{ success: boolean; error?: string }>

@@ -100,7 +100,7 @@ export function startXray(configPath: string): void {
         // Handle stdout
         xrayProcess.stdout?.on('data', (data: Buffer) => {
             const output = data.toString().trim()
-            if (output) {
+            if (output && !output.includes('socks-in -> direct') && !output.includes('127.0.0.1:0')) {
                 addLog('INFO', output)
                 // Parse for traffic stats
                 import('./traffic-monitor').then(({ parseXrayLog }) => {
@@ -112,7 +112,8 @@ export function startXray(configPath: string): void {
         // Handle stderr
         xrayProcess.stderr?.on('data', (data: Buffer) => {
             const output = data.toString().trim()
-            if (output) {
+            // Filter redundant connection closed errors or noise
+            if (output && !output.includes('socks-in -> direct')) {
                 addLog('ERROR', output)
                 // Parse for traffic stats
                 import('./traffic-monitor').then(({ parseXrayLog }) => {
@@ -155,6 +156,20 @@ export function startXray(configPath: string): void {
         addLog('ERROR', `Failed to start Xray: ${error.message}`)
         throw error
     }
+
+    // DIAGNOSTIC:: Check Port from Config
+    try {
+        const configContent = fs.readFileSync(configPath, 'utf-8')
+        const config = JSON.parse(configContent)
+        const socksInbound = config.inbounds?.find((i: any) => i.tag === 'socks-in')
+        if (socksInbound) {
+            addLog('INFO', `[DIAGNOSTIC] Xray Listening on Port: ${socksInbound.port}`)
+        } else {
+            addLog('WARNING', `[DIAGNOSTIC] Could not find 'socks-in' tag in config!`)
+        }
+    } catch (e: any) {
+        addLog('ERROR', `[DIAGNOSTIC] Failed to parse config for port check: ${e.message}`)
+    }
 }
 
 /**
@@ -163,41 +178,48 @@ export function startXray(configPath: string): void {
 export function killXray(): void {
     if (!xrayProcess) {
         addLog('WARNING', 'No Xray process to kill')
-        return
-    }
+    } else {
+        addLog('INFO', 'Stopping Xray-core...')
 
-    addLog('INFO', 'Stopping Xray-core...')
+        try {
+            xrayProcess.kill('SIGTERM')
 
-    try {
-        xrayProcess.kill('SIGTERM')
+            // Force kill after 5 seconds if still running
+            setTimeout(() => {
+                if (xrayProcess && !xrayProcess.killed) {
+                    addLog('WARNING', 'Force killing Xray process')
+                    xrayProcess.kill('SIGKILL')
+                }
+            }, 5000)
 
-        // Force kill after 5 seconds if still running
-        setTimeout(() => {
-            if (xrayProcess && !xrayProcess.killed) {
-                addLog('WARNING', 'Force killing Xray process')
-                xrayProcess.kill('SIGKILL')
+            addLog('SUCCESS', 'Xray-core stopped')
+
+            // Clear stats polling interval
+            if ((global as any).xrayStatsInterval) {
+                clearInterval((global as any).xrayStatsInterval)
+                    ; (global as any).xrayStatsInterval = null
             }
-        }, 5000)
 
-        addLog('SUCCESS', 'Xray-core stopped')
-
-        // Clear stats polling interval
-        if ((global as any).xrayStatsInterval) {
-            clearInterval((global as any).xrayStatsInterval)
-                ; (global as any).xrayStatsInterval = null
+            // Stop traffic monitoring and reset stats
+            import('./traffic-monitor').then(({ stopTrafficMonitoring, resetTrafficStats }) => {
+                stopTrafficMonitoring()
+                resetTrafficStats()
+            })
+        } catch (error: any) {
+            addLog('ERROR', `Failed to stop Xray: ${error.message}`)
         }
-
-        // Stop traffic monitoring and reset stats
-        import('./traffic-monitor').then(({ stopTrafficMonitoring, resetTrafficStats }) => {
-            stopTrafficMonitoring()
-            resetTrafficStats()
-        })
-    } catch (error: any) {
-        addLog('ERROR', `Failed to stop Xray: ${error.message}`)
+        xrayProcess = null
     }
-
-    xrayProcess = null
 }
+
+// --- Sing-Box TUN Management ---
+
+
+
+
+
+// --- Xray/Sing-Box Status Functions ---
+
 
 /**
  * Check if Xray is currently running
@@ -231,7 +253,7 @@ export function getXrayPid(): number | undefined {
 // Stats tracking
 let statsUploaded = 0
 let statsDownloaded = 0
-let lastStatsCheck = Date.now()
+
 
 /**
  * Query Xray stats API
@@ -286,5 +308,5 @@ export async function getXrayStats(): Promise<{ uploaded: number; downloaded: nu
 export function resetXrayStats(): void {
     statsUploaded = 0
     statsDownloaded = 0
-    lastStatsCheck = Date.now()
+
 }

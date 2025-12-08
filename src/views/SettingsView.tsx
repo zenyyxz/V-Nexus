@@ -667,6 +667,14 @@ export const SettingsView = () => {
                             </div>
 
                             <div className="space-y-6">
+                                {/* TUN Mode (New) */}
+                                <ToggleRow
+                                    label="TUN Mode (VPN)"
+                                    description="Route all system traffic through VPN (requires Admin privileges)"
+                                    checked={settings.tunMode || false}
+                                    onChange={(checked) => updateSettings({ tunMode: checked })}
+                                />
+
                                 {/* Set System Proxy */}
                                 <ToggleRow
                                     label={t('net_set_system_proxy')}

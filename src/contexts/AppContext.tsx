@@ -35,6 +35,15 @@ export interface Profile {
     shortId?: string
     spiderX?: string
     email?: string
+    subscriptionId?: string // Link to subscription
+}
+
+export interface Subscription {
+    id: string
+    name: string
+    url: string
+    updatedAt: string // ISO string
+    count: number
 }
 
 export interface AppSettings {
@@ -64,6 +73,7 @@ export interface AppSettings {
     webrtcLeakProtection: boolean
     theme: 'dark' | 'light'
     routingMode: 'global' | 'bypass-lan' | 'bypass-china' | 'custom'
+    tunMode: boolean
     connectionHealthCheck: boolean
     profileTemplates: Array<{ name: string; template: Partial<Profile> }>
     // Qv2ray settings
@@ -141,9 +151,10 @@ interface AppState {
         connectedIp: string
         connectedRegion: string
     }
+    subscriptions: Subscription[]
 }
 
-interface AppContextType extends AppState {
+export interface AppContextType extends AppState {
     updateSettings: (settings: Partial<AppSettings>) => void
     addProfile: (profile: Profile) => void
     removeProfile: (id: string) => void
@@ -162,8 +173,8 @@ const defaultSettings: AppSettings = {
     deviceId: crypto.randomUUID(),
     userAgent: 'Chrome/Latest',
     logLevel: 'warning',
-    showLogs: false,
-    allowInsecure: false,
+    showLogs: true,
+    allowInsecure: true,
     muxEnabled: false,
     muxConcurrency: 8,
     dnsQueryStrategy: 'UseIP',
@@ -183,6 +194,7 @@ const defaultSettings: AppSettings = {
     webrtcLeakProtection: true,
     theme: 'dark',
     routingMode: 'global',
+    tunMode: true,  // TUN mode ON by default
     connectionHealthCheck: true,
     profileTemplates: [],
     // Qv2ray settings defaults
@@ -200,7 +212,7 @@ const defaultSettings: AppSettings = {
     // Inbound settings defaults
     setSystemProxy: false,
     socksEnabled: true,
-    socksPort: 1089,
+    socksPort: 1089,  // Qv2ray default SOCKS port
     socksUdpEnabled: true,
     socksUdpLocalIp: '127.0.0.1',
     socksAuthEnabled: false,
@@ -210,7 +222,7 @@ const defaultSettings: AppSettings = {
     socksDestOverrideHttp: false,
     socksDestOverrideTls: false,
     httpEnabled: true,
-    httpPort: 8889,
+    httpPort: 8889,  // Qv2ray default HTTP port
     httpAuthEnabled: false,
     httpUsername: 'user',
     httpPassword: 'pass',
@@ -371,6 +383,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }))
     }
 
+    const addSubscription = (sub: Subscription) => {
+        setState(prev => ({
+            ...prev,
+            subscriptions: [...prev.subscriptions, sub]
+        }))
+    }
+
+    const removeSubscription = (id: string) => {
+        setState(prev => ({
+            ...prev,
+            subscriptions: prev.subscriptions.filter(s => s.id !== id),
+            // Also remove profiles associated with this subscription
+            profiles: prev.profiles.filter(p => p.subscriptionId !== id)
+        }))
+    }
+
+    const updateSubscription = (id: string, updates: Partial<Subscription>) => {
+        setState(prev => ({
+            ...prev,
+            subscriptions: prev.subscriptions.map(s => s.id === id ? { ...s, ...updates } : s)
+        }))
+    }
+
     return (
         <AppContext.Provider value={{
             ...state,
@@ -383,7 +418,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             updateStats,
             updateSessionStats,
             addTrafficDataPoint,
-            clearTrafficData
+            clearTrafficData,
+            addSubscription,
+            removeSubscription,
+            updateSubscription
         }}>
             {children}
         </AppContext.Provider>

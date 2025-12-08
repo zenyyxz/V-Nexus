@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron'
+import { exec, spawn } from 'child_process'
 import path from 'path'
 import { startXray, killXray } from './core-manager'
 import { enableSystemProxy, disableSystemProxy } from './system-proxy'
@@ -144,11 +145,17 @@ const createWindow = () => {
     })
 
     // and load the index.html of the app.
+    // and load the index.html of the app.
     if (process.env.NODE_ENV === 'development') {
         mainWindow.loadURL('http://localhost:5173')
         mainWindow.webContents.openDevTools()
     } else {
-        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
+        const indexPath = path.join(__dirname, '../dist/index.html')
+        console.log('Loading Production Index:', indexPath)
+
+        mainWindow.loadFile(indexPath).catch(e => {
+            console.error('Failed to load index.html:', e)
+        })
     }
 
     // Initialize auto-updater with main window
@@ -194,16 +201,46 @@ ipcMain.handle('xray:start', async (_, profileData: any, settingsData: any) => {
         console.log('Starting Xray with profile:', profileData)
         console.log('Using settings:', settingsData)
 
+        const { tunManager } = await import('./tun_manager')
+
+        // Force correct ports (Standard defaults)
+        settingsData.socksPort = 10808
+        settingsData.httpPort = 10809
+
+        // 1. ALWAYS Start Xray (It acts as the SOCKS5 server for both modes)
+        console.log('Generating Xray configuration...')
         const { generateAndSaveConfig } = await import('./xray-config-generator')
         const configPath = generateAndSaveConfig(profileData, settingsData)
 
         startXray(configPath)
-        await enableSystemProxy(10809)
+
+        // 2. Mode Specific Setup
+        if (settingsData.tunMode) {
+            // ===== TUN MODE: Xray + Tun2Socks =====
+            console.log('TUN Mode enabled - Starting TunManager...')
+
+            // Xray acts as the socks proxy
+            await tunManager.start(null, {
+                serverIp: profileData.address,
+                proxyPort: settingsData.socksPort,
+                dnsServers: ['1.1.1.1', '1.0.0.1']
+            })
+
+        } else {
+            // ===== SYSTEM PROXY MODE: Xray + System Proxy =====
+            console.log('System Proxy mode - setting up system proxy')
+
+            // Only set system proxy if the toggle is enabled
+            if (settingsData.setSystemProxy) {
+                await enableSystemProxy(settingsData.httpPort)
+            }
+        }
+
+        // Get server IP for kill switch
+        const serverIp = profileData.address
 
         // Enable kill switch if configured
         if (settingsData.killSwitch) {
-            // Resolve server IP
-            const serverIp = profileData.address
             const result = await killSwitch.enable(serverIp)
             if (!result.success) {
                 console.error('Failed to enable kill switch:', result.error)
@@ -216,14 +253,28 @@ ipcMain.handle('xray:start', async (_, profileData: any, settingsData: any) => {
         return { success: true }
     } catch (error: any) {
         console.error('Failed to start Xray:', error)
+        // Cleanup if failed
+        killXray()
         return { success: false, error: error.message }
     }
 })
 
 ipcMain.handle('xray:stop', async () => {
     try {
-        console.log('Stopping Xray...')
+        console.log('Stopping proxy...')
+
+        const { tunManager } = await import('./tun_manager')
+
+        // Stop TUN if running
+        // Note: We might need the Server IP to clean specific routes?
+        // For now, TunManager.stop() cleans what it can. 
+        // Ideally we should track the active server IP in state, but TunManager handles general cleanup.
+        await tunManager.stop()
+
+        // Stop Xray
         killXray()
+        // We removed killSingBox() call as we don't use it anymore
+
         await disableSystemProxy()
 
         // Disable kill switch
@@ -346,11 +397,61 @@ ipcMain.handle('xray:stats', async () => {
 })
 
 // Clean up on exit
-app.on('before-quit', async () => {
-    isQuitting = true // Ensure we actually quit
-    killXray()
-    await disableSystemProxy()
-    await killSwitch.disable() // Clean up firewall rules
+// Fetch URL content (bypass CORS)
+ipcMain.handle('utils:fetch', async (_, url: string) => {
+    try {
+        const response = await fetch(url)
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        const text = await response.text()
+        return { success: true, data: text }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+})
+
+// Clean up on exit
+app.on('before-quit', async (_event) => {
+    // Prevent default to allow async cleanup if needed, but here we just block
+    isQuitting = true
+    console.log('App is quitting, cleaning up...')
+
+    try {
+        killXray()
+        await disableSystemProxy()
+        await killSwitch.disable()
+    } catch (e) {
+        console.error('Cleanup failed:', e)
+    }
+})
+
+// Check if running as Admin
+ipcMain.handle('system:check-admin', async () => {
+    return new Promise((resolve) => {
+        exec('net session', (err) => {
+            resolve({ success: true, isAdmin: !err })
+        })
+    })
+})
+
+// Restart as Admin
+ipcMain.handle('system:restart-as-admin', async () => {
+    if (process.env.NODE_ENV === 'development') {
+        return { success: false, error: 'Cannot auto-restart in Development mode. Please restart your terminal as Administrator.' }
+    }
+
+    const appPath = app.getPath('exe')
+    // In dev, appPath is electron.exe, we need to handle that or just try best effort
+    // For production, this works perfectly.
+    console.log('Restarting as Admin:', appPath)
+
+    // Spawn PowerShell to start the process with RunAs verb (Admin)
+    spawn('powershell', ['Start-Process', `"${appPath}"`, '-Verb', 'RunAs'], { detached: true })
+
+    // Quit current instance
+    app.quit()
+    return { success: true }
 })
 
 // In this file you can include the rest of your app's specific main process

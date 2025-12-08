@@ -1,0 +1,72 @@
+{
+    "log": {
+        "level": "info",
+        "timestamp": true
+    },
+    "dns": {
+        "servers": [
+            {
+                "tag": "cloudflare",
+                "address": "1.1.1.1",
+                "detour": "direct"
+            },
+            {
+                "tag": "cloudflare_secondary",
+                "address": "1.0.0.1",
+                "detour": "direct"
+            }
+        ],
+        "final": "cloudflare"
+    },
+    "inbounds": [
+        {
+            "type": "tun",
+            "tag": "tun-in",
+            "interface_name": "test_tun",
+            "address": [
+                "172.19.0.1/30"
+            ],
+            "mtu": 9000,
+            "auto_route": true,
+            "strict_route": true,
+            "stack": "gvisor",
+            "sniff": true,
+            "sniff_override_destination": true
+        }
+    ],
+    "outbounds": [
+        {
+            "type": "vless",
+            "tag": "proxy",
+            "server": "sg.panel.zenyypriv.ggff.net",
+            "server_port": 443,
+            "uuid": "25cd34d7-0212-43fe-b960-6fee87f98c75",
+            "network": "tcp",
+            "tls": {
+                "enabled": true,
+                "server_name": "aka.ms",
+                "insecure": true
+            }
+        },
+        {
+            "type": "direct",
+            "tag": "direct"
+        },
+        {
+            "type": "block",
+            "tag": "block"
+        }
+    ],
+    "route": {
+        "auto_detect_interface": true,
+        "final": "proxy",
+        "rules": [
+            {
+                "port": [
+                    53
+                ],
+                "outbound": "direct"
+            }
+        ]
+    }
+}

@@ -122,7 +122,7 @@ export const parseProfileLink = (link: string): Profile | null => {
             const decodedLink = atob(base64)
 
             // Check for deviceID restriction
-            const [base, hash] = decodedLink.split('#')
+            const [base] = decodedLink.split('#')
             // Parse params from the base URL part. Params usually start after ?
             const paramStart = base.indexOf('?')
             if (paramStart !== -1) {
@@ -407,5 +407,40 @@ export const generateLockedLink = (profile: Profile, deviceId?: string): string 
         return link
     } catch (e) {
         return ''
+    }
+}
+
+export const parseSubscriptionContent = (content: string): Profile[] => {
+    try {
+        // Handle Base64 encoding
+        // Some subscriptions return plain text, others base64. Try to decode if it looks like base64.
+        let decoded = content.trim()
+        const isBase64 = /^[a-zA-Z0-9+/=]+$/.test(decoded.replace(/\s/g, ''))
+
+        if (isBase64) {
+            try {
+                decoded = atob(decoded)
+            } catch (e) {
+                // Ignore, might be plain text
+            }
+        }
+
+        const lines = decoded.split(/[\r\n]+/)
+        const profiles: Profile[] = []
+
+        lines.forEach(line => {
+            const link = line.trim()
+            if (!link) return
+
+            const profile = parseProfileLink(link)
+            if (profile) {
+                profiles.push(profile)
+            }
+        })
+
+        return profiles
+    } catch (error) {
+        console.error('Failed to parse subscription content:', error)
+        return []
     }
 }

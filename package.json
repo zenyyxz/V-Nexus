@@ -14,8 +14,8 @@
     "dependencies": {
         "@grpc/grpc-js": "^1.14.2",
         "@grpc/proto-loader": "^0.8.0",
-        "@types/qrcode": "^1.5.6",
         "clsx": "^2.1.0",
+        "default-gateway": "^7.2.2",
         "electron-log": "^5.4.3",
         "electron-squirrel-startup": "^1.0.1",
         "electron-updater": "^6.6.2",
@@ -26,11 +26,13 @@
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "react-router-dom": "^6.22.3",
+        "sudo-prompt": "^9.2.1",
         "uuid": "^9.0.1",
         "zustand": "^4.5.2"
     },
     "devDependencies": {
         "@types/node": "^20.11.24",
+        "@types/qrcode": "^1.5.6",
         "@types/react": "^18.2.64",
         "@types/react-dom": "^18.2.21",
         "@types/uuid": "^9.0.8",
@@ -38,45 +40,44 @@
         "autoprefixer": "^10.4.22",
         "concurrently": "^8.2.2",
         "cross-env": "^7.0.3",
-        "electron": "^39.2.6",
         "electron-builder": "^24.13.3",
-        "postcss": "^8.5.6",
+        "postcss": "^8.4.35",
         "tailwindcss": "^3.4.1",
-        "typescript": "^5.2.2",
         "vite": "^5.1.4",
         "wait-on": "^7.2.0"
     },
+    "files": [
+        "dist/**/*",
+        "dist-electron/**/*",
+        "!resources/**/*",
+        "!node_modules/**/*",
+        "!**/*.map"
+    ],
     "build": {
-        "appId": "com.vnexus.client",
+        "appId": "com.vnexus.app",
         "productName": "V-Nexus",
-        "publish": [
-            {
-                "provider": "github",
-                "owner": "zenyyxz",
-                "repo": "V-Nexus"
-            }
-        ],
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "perMachine": true,
+            "deleteAppDataOnUninstall": true
+        },
+        "win": {
+            "requestedExecutionLevel": "requireAdministrator"
+        },
+        "compression": "maximum",
+        "asar": true,
         "extraResources": [
             {
-                "from": "resources/xray",
-                "to": "xray",
+                "from": "resources",
+                "to": "resources",
                 "filter": [
-                    "**/*"
+                    "xray.exe",
+                    "geoip.dat",
+                    "geosite.dat",
+                    "tun2socks/**/*"
                 ]
             }
-        ],
-        "win": {
-            "target": "nsis",
-            "icon": "build/icon.ico",
-            "signingHashAlgorithms": [
-                "sha256"
-            ],
-            "certificateFile": "build/certificate.pfx",
-            "certificatePassword": ""
-        },
-        "files": [
-            "dist/**/*",
-            "dist-electron/**/*"
         ]
     }
 }

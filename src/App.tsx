@@ -14,6 +14,8 @@ import { UpdateNotificationBanner } from './components/UpdateNotificationBanner'
 import { useApp } from './contexts/AppContext'
 import { useUpdateChecker } from './hooks/useUpdateChecker'
 import { useTranslation } from './hooks/useTranslation'
+import { useReconnect } from './hooks/useReconnect'
+import { useHealthCheck } from './hooks/useHealthCheck'
 
 function AnimatedRoutes() {
     const location = useLocation()
@@ -72,6 +74,10 @@ function App() {
     }, [settings.theme])
 
     const { t } = useTranslation()
+
+    // Initialize global background services
+    useReconnect()
+    useHealthCheck()
 
     const navItems = [
         { to: '/', icon: <Home size={18} />, label: t('nav_home') },

@@ -18,6 +18,9 @@ interface AppSettings {
     customProxyType: 'http' | 'socks'
     customProxyServer: string
     customProxyPort: number
+    tunMode: boolean
+    socksPort?: number
+    httpPort?: number
 }
 
 // Profile type definition (matching src/contexts/AppContext.tsx)
@@ -76,7 +79,7 @@ export function generateXrayConfig(profile: Profile, settings: AppSettings): Xra
             access: '',     // Output access logs to stdout (connection events)
             error: ''       // Output errors to stderr
         },
-        inbounds: generateInbounds(),
+        inbounds: generateInbounds(settings),
         outbounds: [
             generateOutbound(profile, settings),
             // Add custom proxy outbound if configured
@@ -194,11 +197,14 @@ function generateRouting(): any {
 /**
  * Generate inbound configurations (SOCKS + HTTP proxy)
  */
-function generateInbounds(): any[] {
-    return [
+function generateInbounds(settings: AppSettings): any[] {
+    const socksPort = settings.socksPort || 10808
+    const httpPort = settings.httpPort || 10809
+
+    const inbounds: any[] = [
         {
             tag: 'socks-in',
-            port: 10808,
+            port: socksPort,
             listen: '127.0.0.1',
             protocol: 'socks',
             settings: {
@@ -213,7 +219,7 @@ function generateInbounds(): any[] {
         },
         {
             tag: 'http-in',
-            port: 10809,
+            port: httpPort,
             listen: '127.0.0.1',
             protocol: 'http',
             settings: {
@@ -235,6 +241,10 @@ function generateInbounds(): any[] {
             }
         }
     ]
+    // TUN Mode is now handled by external tun2socks process
+    // We do NOT add a native tun inbound here anymore.
+
+    return inbounds
 }
 
 /**
