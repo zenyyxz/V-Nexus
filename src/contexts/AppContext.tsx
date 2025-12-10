@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { DEFAULT_SETTINGS } from '../constants/defaults'
 
 export type AppMode = 'simple' | 'advanced'
 
@@ -152,10 +153,15 @@ interface AppState {
         connectedRegion: string
     }
     subscriptions: Subscription[]
+    logs: string[]
+    customConfig: string | null
+    selectedProfileId: string | null
 }
 
 export interface AppContextType extends AppState {
     updateSettings: (settings: Partial<AppSettings>) => void
+    setCustomConfig: (config: string | null) => void
+    setSelectedProfileId: (id: string | null) => void
     addProfile: (profile: Profile) => void
     removeProfile: (id: string) => void
     updateProfile: (id: string, profile: Partial<Profile>) => void
@@ -168,87 +174,14 @@ export interface AppContextType extends AppState {
     addSubscription: (sub: Subscription) => void
     removeSubscription: (id: string) => void
     updateSubscription: (id: string, updates: Partial<Subscription>) => void
+    addLog: (log: string) => void
+    clearLogs: () => void
 }
 
 const defaultSettings: AppSettings = {
-    mode: 'simple',
-    language: 'English',
+    ...DEFAULT_SETTINGS,
     deviceId: crypto.randomUUID(),
-    userAgent: 'Chrome/Latest',
-    logLevel: 'warning',
-    showLogs: true,
-    allowInsecure: true,
-    muxEnabled: false,
-    muxConcurrency: 8,
-    dnsQueryStrategy: 'UseIP',
-    dnsLog: false,
-    dnsDisableCache: false,
-    dnsDisableFallback: false,
-    dnsDisableFallbackIfMatch: false,
-    selectedDnsServer: 'DoU: 1.1.1.1',
-    customDnsServers: [],
-    autoSelectFastest: false,
-    // New features defaults
-    launchOnStartup: false,
-    connectOnBoot: false,
-    reconnectOnFailure: true,
-    killSwitch: false,
-    dnsLeakProtection: true,
-    webrtcLeakProtection: true,
-    theme: 'dark',
-    routingMode: 'global',
-    tunMode: true,  // TUN mode ON by default
-    connectionHealthCheck: true,
-    profileTemplates: [],
-    // Qv2ray settings defaults
-    maxLogLines: 500,
-    autoConnect: 'none',
-    latencyTestMethod: 'tcping',
-    realPingTestUrl: 'https://www.google.com',
-    proxyType: 'none',
-    customProxyType: 'http',
-    customProxyServer: '127.0.0.1',
-    customProxyPort: 8000,
-    testLatencyPeriodically: false,
-    testLatencyOnConnected: false,
-    disableSystemRootCerts: false,
-    // Inbound settings defaults
-    setSystemProxy: false,
-    socksEnabled: true,
-    socksPort: 1089,  // Qv2ray default SOCKS port
-    socksUdpEnabled: true,
-    socksUdpLocalIp: '127.0.0.1',
-    socksAuthEnabled: false,
-    socksUsername: 'user',
-    socksPassword: 'pass',
-    socksSniffing: true,
-    socksDestOverrideHttp: false,
-    socksDestOverrideTls: false,
-    httpEnabled: true,
-    httpPort: 8889,  // Qv2ray default HTTP port
-    httpAuthEnabled: false,
-    httpUsername: 'user',
-    httpPassword: 'pass',
-    httpSniffing: true,
-    httpDestOverrideHttp: false,
-    httpDestOverrideTls: false,
-    browserForwarderAddress: '127.0.0.1',
-    browserForwarderPort: 8088,
-    // Connection settings defaults
-    forceDirectConnection: false,
-    bypassPrivateAddresses: true,
-    bypassCnMainland: true,
-    bypassBittorrent: false,
-    useV2rayDnsForDirect: false,
-    dnsIntercept: false,
-    forwardProxyEnabled: false,
-    forwardProxyType: 'http',
-    forwardProxyHost: '',
-    forwardProxyPort: 1,
-    forwardProxyAuthEnabled: false,
-    forwardProxyUsername: '',
-    forwardProxyPassword: '',
-}
+} as AppSettings
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
@@ -285,6 +218,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     parsed.trafficGraphData = []
                 }
 
+                // Ensure logs exists (migration)
+                if (!parsed.logs) {
+                    parsed.logs = []
+                }
+
+                // Migrate bad default ports (1089/8889) to standard (10808/10809)
+                if (parsed.settings) {
+                    if (parsed.settings.socksPort === 1089) parsed.settings.socksPort = 10808
+                    if (parsed.settings.httpPort === 8889) parsed.settings.httpPort = 10809
+                    // Ensure tunMode matches default if missing
+                    if (parsed.settings.tunMode === undefined) parsed.settings.tunMode = true
+                }
+
                 return parsed
             } catch {
                 return {
@@ -295,7 +241,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     connectedAt: null,
                     stats: { memoryUsage: 0, uploadSpeed: 0, downloadSpeed: 0, totalTunneled: 0 },
                     trafficGraphData: [],
-                    sessionStats: { uploaded: 0, downloaded: 0, connectedIp: '', connectedRegion: '' }
+                    sessionStats: { uploaded: 0, downloaded: 0, connectedIp: '', connectedRegion: '' },
+                    logs: []
                 }
             }
         }
@@ -307,112 +254,176 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             connectedAt: null,
             stats: { memoryUsage: 0, uploadSpeed: 0, downloadSpeed: 0, totalTunneled: 0 },
             trafficGraphData: [],
-            sessionStats: { uploaded: 0, downloaded: 0, connectedIp: '', connectedRegion: '' }
+            sessionStats: { uploaded: 0, downloaded: 0, connectedIp: '', connectedRegion: '' },
+            logs: [],
+            customConfig: null
         }
     })
 
     useEffect(() => {
-        localStorage.setItem('v2ray-app-state', JSON.stringify(state))
+        // Exclude logs from persistence to save space/perf
+        const { logs, ...persistedState } = state
+        localStorage.setItem('v2ray-app-state', JSON.stringify(persistedState))
     }, [state])
 
-    const updateSettings = (newSettings: Partial<AppSettings>) => {
+    const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
         setState(prev => ({
             ...prev,
             settings: { ...prev.settings, ...newSettings }
         }))
-    }
+    }, [])
 
-    const addProfile = (profile: Profile) => {
+    const setCustomConfig = useCallback((config: string | null) => {
+        setState(prev => ({ ...prev, customConfig: config }))
+    }, [])
+
+    const setSelectedProfileId = useCallback((id: string | null) => {
+        setState(prev => ({ ...prev, selectedProfileId: id }))
+    }, [])
+
+    const addProfile = useCallback((profile: Profile) => {
         setState(prev => ({
             ...prev,
             profiles: [...prev.profiles, profile]
         }))
-    }
+    }, [])
 
-    const removeProfile = (id: string) => {
+    const removeProfile = useCallback((id: string) => {
         setState(prev => ({
             ...prev,
             profiles: prev.profiles.filter(p => p.id !== id),
             activeProfileId: prev.activeProfileId === id ? null : prev.activeProfileId
         }))
-    }
+    }, [])
 
-    const updateProfile = (id: string, updates: Partial<Profile>) => {
+    const updateProfile = useCallback((id: string, updates: Partial<Profile>) => {
         setState(prev => ({
             ...prev,
             profiles: prev.profiles.map(p => p.id === id ? { ...p, ...updates } : p)
         }))
-    }
+    }, [])
 
-    const setActiveProfile = (id: string | null) => {
+    const setActiveProfile = useCallback((id: string | null) => {
         setState(prev => ({ ...prev, activeProfileId: id }))
-    }
+    }, [])
 
-    const setConnected = (connected: boolean) => {
+    const setConnected = useCallback((connected: boolean) => {
         setState(prev => ({
             ...prev,
             isConnected: connected,
             connectedAt: connected ? Date.now() : null,
-            trafficGraphData: connected ? prev.trafficGraphData : [] // Clear graph data on disconnect
+            trafficGraphData: connected ? prev.trafficGraphData : []
         }))
-    }
+    }, [])
 
-    const addTrafficDataPoint = (dataPoint: TrafficDataPoint) => {
+    const addTrafficDataPoint = useCallback((dataPoint: TrafficDataPoint) => {
         setState(prev => {
             const newData = [...prev.trafficGraphData, dataPoint]
-            // Keep only last 60 data points
             return {
                 ...prev,
                 trafficGraphData: newData.slice(-60)
             }
         })
-    }
+    }, [])
 
-    const clearTrafficData = () => {
+    const clearTrafficData = useCallback(() => {
         setState(prev => ({ ...prev, trafficGraphData: [] }))
-    }
+    }, [])
 
-    const updateStats = (newStats: Partial<AppState['stats']>) => {
+    const updateStats = useCallback((newStats: Partial<AppState['stats']>) => {
         setState(prev => ({
             ...prev,
             stats: { ...prev.stats, ...newStats }
         }))
-    }
+    }, [])
 
-    const updateSessionStats = (newStats: Partial<AppState['sessionStats']>) => {
+    const updateSessionStats = useCallback((newStats: Partial<AppState['sessionStats']>) => {
         setState(prev => ({
             ...prev,
             sessionStats: { ...prev.sessionStats, ...newStats }
         }))
-    }
+    }, [])
 
-    const addSubscription = (sub: Subscription) => {
+    const addSubscription = useCallback((sub: Subscription) => {
         setState(prev => ({
             ...prev,
             subscriptions: [...prev.subscriptions, sub]
         }))
-    }
+    }, [])
 
-    const removeSubscription = (id: string) => {
+    const removeSubscription = useCallback((id: string) => {
         setState(prev => ({
             ...prev,
             subscriptions: prev.subscriptions.filter(s => s.id !== id),
-            // Also remove profiles associated with this subscription
             profiles: prev.profiles.filter(p => p.subscriptionId !== id)
         }))
-    }
+    }, [])
 
-    const updateSubscription = (id: string, updates: Partial<Subscription>) => {
+    const updateSubscription = useCallback((id: string, updates: Partial<Subscription>) => {
         setState(prev => ({
             ...prev,
             subscriptions: prev.subscriptions.map(s => s.id === id ? { ...s, ...updates } : s)
         }))
-    }
+    }, [])
+
+    // Global Log Listener (Restored)
+    useEffect(() => {
+        let unlistenFn: (() => void) | undefined;
+        let isMounted = true;
+
+        const setupLogListener = async () => {
+            try {
+                // Use dynamic import but log success
+                const { listen } = await import('@tauri-apps/api/event')
+                console.log('[AppContext] Setting up Xray log listener...')
+
+                unlistenFn = await listen('xray-log', (event: any) => {
+                    if (!isMounted) return
+                    const payload = event.payload as { level: string, message: string }
+
+                    const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false })
+                    const logLine = `[${timestamp}] [${payload.level}] ${payload.message}`
+
+                    setState(prev => {
+                        const maxLines = prev.settings.maxLogLines || 500
+                        const newLogs = [...prev.logs, logLine]
+                        if (newLogs.length > maxLines) {
+                            return { ...prev, logs: newLogs.slice(newLogs.length - maxLines) }
+                        }
+                        return { ...prev, logs: newLogs }
+                    })
+                })
+                console.log('[AppContext] Log listener attached successfully')
+            } catch (err) {
+                console.error('[AppContext] Failed to setup log listener:', err)
+            }
+        }
+
+        setupLogListener()
+
+        return () => {
+            isMounted = false
+            if (unlistenFn) unlistenFn()
+        }
+    }, [])
+
+    const addLog = useCallback((log: string) => {
+        setState(prev => ({
+            ...prev,
+            logs: [...prev.logs, log].slice(-(prev.settings.maxLogLines || 500))
+        }))
+    }, [])
+
+    const clearLogs = useCallback(() => {
+        setState(prev => ({ ...prev, logs: [] }))
+    }, [])
 
     return (
         <AppContext.Provider value={{
             ...state,
             updateSettings,
+            setCustomConfig,
+            setSelectedProfileId,
             addProfile,
             removeProfile,
             updateProfile,
@@ -424,7 +435,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             clearTrafficData,
             addSubscription,
             removeSubscription,
-            updateSubscription
+            updateSubscription,
+            addLog,
+            clearLogs
         }}>
             {children}
         </AppContext.Provider>

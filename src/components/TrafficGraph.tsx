@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { useApp } from '../contexts/AppContext'
 
 export const TrafficGraph = () => {
@@ -25,7 +26,7 @@ export const TrafficGraph = () => {
 
         const interval = setInterval(async () => {
             try {
-                const stats = await window.xray.getStats()
+                const stats = await invoke<any>('get_xray_stats')
 
                 if (stats.success) {
                     const now = Date.now()
@@ -60,10 +61,17 @@ export const TrafficGraph = () => {
                     })
 
                     // Update global stats with current speeds
+                    // Update global stats with current speeds and totals
                     updateStats({
                         uploadSpeed,
                         downloadSpeed,
                         totalTunneled: stats.uploaded + stats.downloaded
+                    })
+
+                    // Update session stats (Totals for HomeView)
+                    updateSessionStats({
+                        uploaded: stats.uploaded,
+                        downloaded: stats.downloaded
                     })
 
                     addTrafficDataPoint({

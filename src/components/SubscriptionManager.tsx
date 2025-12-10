@@ -4,6 +4,8 @@ import { useApp, Subscription, Profile } from '../contexts/AppContext'
 import { useToast } from '../contexts/ToastContext'
 import { parseSubscriptionContent } from '../utils/profile-parser'
 
+import { fetch } from '@tauri-apps/plugin-http'
+
 export const SubscriptionManager = () => {
     const { subscriptions, addSubscription, removeSubscription, updateSubscription, addProfile, removeProfile, profiles } = useApp()
     const { showToast } = useToast()
@@ -14,11 +16,13 @@ export const SubscriptionManager = () => {
 
     const fetchSubscriptionData = async (url: string): Promise<Profile[] | null> => {
         try {
-            const result = await window.utils.fetch(url)
-            if (result.success && result.data) {
-                return parseSubscriptionContent(result.data)
+            const response = await fetch(url)
+            if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`)
+            const text = await response.text()
+            if (text) {
+                return parseSubscriptionContent(text)
             } else {
-                throw new Error(result.error || 'Failed to fetch')
+                throw new Error('Empty response')
             }
         } catch (error: any) {
             console.error('Subscription fetch failed:', error)

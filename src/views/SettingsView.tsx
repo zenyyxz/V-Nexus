@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from '../hooks/useTranslation'
 import { useApp } from '../contexts/AppContext'
 import { useToast } from '../contexts/ToastContext'
 import { UpdateChecker } from '../components/UpdateChecker'
 import { LegalDocModal } from '../components/LegalDocModal'
 import { PRIVACY_POLICY, TERMS_OF_USE } from '../constants/legalDocs'
+import { DEFAULT_SETTINGS } from '../constants/defaults'
 import { Settings as SettingsIcon, Globe, Wifi, Shield, Info, Copy, Plus, Trash2, Check, AlertTriangle } from 'lucide-react'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 
 const DNS_SERVERS = [
     { label: 'DoU: 1.1.1.1', value: 'udp://1.1.1.1' },
@@ -28,18 +30,20 @@ const USER_AGENTS = [
 ]
 
 // ToggleRow Component
-const ToggleRow = ({ label, description, checked, onChange }: { label: string, description: string, checked: boolean, onChange: (checked: boolean) => void }) => (
-    <div className="flex items-center justify-between py-2">
+// ToggleRow Component
+const ToggleRow = ({ label, description, checked, onChange, disabled = false }: { label: string, description: string, checked: boolean, onChange: (checked: boolean) => void, disabled?: boolean }) => (
+    <div className={`flex items-center justify-between py-2 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         <div>
             <div className="text-sm font-medium text-primary">{label}</div>
             <div className="text-xs text-secondary mt-0.5">{description}</div>
         </div>
-        <label className="relative inline-flex items-center cursor-pointer">
+        <label className={`relative inline-flex items-center ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
             <input
                 type="checkbox"
                 checked={checked}
-                onChange={(e) => onChange(e.target.checked)}
+                onChange={(e) => !disabled && onChange(e.target.checked)}
                 className="sr-only peer"
+                disabled={disabled}
             />
             <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
         </label>
@@ -47,7 +51,7 @@ const ToggleRow = ({ label, description, checked, onChange }: { label: string, d
 )
 
 export const SettingsView = () => {
-    const { settings, updateSettings } = useApp()
+    const { settings, updateSettings, isConnected } = useApp()
     const { t } = useTranslation()
     const { showToast } = useToast()
     const [copied, setCopied] = useState(false)
@@ -62,6 +66,51 @@ export const SettingsView = () => {
     const [templateName, setTemplateName] = useState('')
     const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
 
+    // Persistent Admin
+    const [runAsAdminConfigured, setRunAsAdminConfigured] = useState(false)
+    const [showRestartModal, setShowRestartModal] = useState(false)
+
+    useEffect(() => {
+        // Check if "Always Run as Admin" is configured
+        const checkAdmin = async () => {
+            try {
+                const { invoke } = await import('@tauri-apps/api/core')
+                const configured = await invoke('check_run_as_admin_configured')
+                console.log('[Settings] Admin configured:', configured)
+                setRunAsAdminConfigured(configured as boolean)
+            } catch (error) {
+                console.error('Failed to check admin status:', error)
+            }
+        }
+        checkAdmin()
+    }, [])
+
+    const toggleRunAsAdmin = async (enable: boolean) => {
+        try {
+            const { invoke } = await import('@tauri-apps/api/core')
+            await invoke('set_run_as_admin', { enable })
+            setRunAsAdminConfigured(enable)
+            setShowRestartModal(true)
+        } catch (error) {
+            console.error('Failed to toggle run as admin:', error)
+        }
+    }
+    // Sync Autostart Status
+    useEffect(() => {
+        const syncAutostart = async () => {
+            try {
+                const { isEnabled } = await import('@tauri-apps/plugin-autostart')
+                const enabled = await isEnabled()
+                if (settings.launchOnStartup !== enabled) {
+                    updateSettings({ launchOnStartup: enabled })
+                }
+            } catch (e) {
+                console.error('Failed to sync autostart:', e)
+            }
+        }
+        syncAutostart()
+    }, [])
+
     const tabs = [
         { id: 'general' as const, label: t('settings_section_general'), icon: SettingsIcon },
         { id: 'network' as const, label: t('settings_section_network'), icon: Wifi },
@@ -69,8 +118,8 @@ export const SettingsView = () => {
         { id: 'about' as const, label: t('settings_section_about'), icon: Info }
     ]
 
-    const handleCopyDeviceId = () => {
-        navigator.clipboard.writeText(settings.deviceId)
+    const handleCopyDeviceId = async () => {
+        await writeText(settings.deviceId)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
     }
@@ -146,77 +195,7 @@ export const SettingsView = () => {
             // Reset settings to defaults but keep profiles and deviceId
             const deviceId = settings.deviceId
             updateSettings({
-                mode: 'simple',
-                language: 'English',
-                userAgent: 'Chrome/Latest',
-                logLevel: 'warning',
-                showLogs: false,
-                allowInsecure: false,
-                muxEnabled: false,
-                muxConcurrency: 8,
-                dnsQueryStrategy: 'UseIP',
-                dnsLog: false,
-                dnsDisableCache: false,
-                dnsDisableFallback: false,
-                dnsDisableFallbackIfMatch: false,
-                selectedDnsServer: 'DoU: 1.1.1.1',
-                customDnsServers: [],
-                autoSelectFastest: false,
-                launchOnStartup: false,
-                connectOnBoot: false,
-                reconnectOnFailure: true,
-                killSwitch: false,
-                dnsLeakProtection: true,
-                webrtcLeakProtection: true,
-                theme: 'dark',
-                routingMode: 'global',
-                connectionHealthCheck: true,
-                profileTemplates: [],
-                maxLogLines: 500,
-                autoConnect: 'none',
-                latencyTestMethod: 'tcping',
-                realPingTestUrl: 'https://www.google.com',
-                proxyType: 'none',
-                customProxyType: 'http',
-                customProxyServer: '127.0.0.1',
-                customProxyPort: 8000,
-                testLatencyPeriodically: false,
-                testLatencyOnConnected: false,
-                disableSystemRootCerts: false,
-                setSystemProxy: false,
-                socksEnabled: true,
-                socksPort: 1089,
-                socksUdpEnabled: true,
-                socksUdpLocalIp: '127.0.0.1',
-                socksAuthEnabled: false,
-                socksUsername: 'user',
-                socksPassword: 'pass',
-                socksSniffing: true,
-                socksDestOverrideHttp: false,
-                socksDestOverrideTls: false,
-                httpEnabled: true,
-                httpPort: 8889,
-                httpAuthEnabled: false,
-                httpUsername: 'user',
-                httpPassword: 'pass',
-                httpSniffing: true,
-                httpDestOverrideHttp: false,
-                httpDestOverrideTls: false,
-                browserForwarderAddress: '127.0.0.1',
-                browserForwarderPort: 8088,
-                forceDirectConnection: false,
-                bypassPrivateAddresses: true,
-                bypassCnMainland: true,
-                bypassBittorrent: false,
-                useV2rayDnsForDirect: false,
-                dnsIntercept: false,
-                forwardProxyEnabled: false,
-                forwardProxyType: 'http',
-                forwardProxyHost: '',
-                forwardProxyPort: 1,
-                forwardProxyAuthEnabled: false,
-                forwardProxyUsername: '',
-                forwardProxyPassword: '',
+                ...DEFAULT_SETTINGS,
                 deviceId // Preserve device ID
             })
             showToast('VPN configuration reset to defaults', 'success')
@@ -386,13 +365,29 @@ export const SettingsView = () => {
                                     checked={settings.launchOnStartup}
                                     onChange={async (checked) => {
                                         updateSettings({ launchOnStartup: checked })
-                                        const result = await window.system.setLaunchOnStartup(checked)
-                                        if (result.success) {
-                                            showToast(checked ? 'Launch on startup enabled' : 'Launch on startup disabled', 'success')
-                                        } else {
+                                        try {
+                                            const { enable, disable } = await import('@tauri-apps/plugin-autostart')
+                                            if (checked) {
+                                                await enable()
+                                                showToast('Launch on startup enabled', 'success')
+                                            } else {
+                                                await disable()
+                                                showToast('Launch on startup disabled', 'success')
+                                            }
+                                        } catch (e) {
+                                            console.error(e)
                                             showToast('Failed to update startup settings', 'error')
+                                            // Revert setting on error
+                                            updateSettings({ launchOnStartup: !checked })
                                         }
                                     }}
+                                />
+
+                                <ToggleRow
+                                    label="Always Run as Administrator"
+                                    description="Request administrator privileges automatically when the application starts"
+                                    checked={runAsAdminConfigured}
+                                    onChange={toggleRunAsAdmin}
                                 />
 
                                 <ToggleRow
@@ -487,6 +482,7 @@ export const SettingsView = () => {
                                         description={t('settings_allow_insecure_desc')}
                                         checked={settings.allowInsecure}
                                         onChange={(checked) => updateSettings({ allowInsecure: checked })}
+                                        disabled={isConnected}
                                     />
                                 </div>
                             </div>
@@ -512,7 +508,8 @@ export const SettingsView = () => {
                                         <select
                                             value={settings.dnsQueryStrategy}
                                             onChange={(e) => updateSettings({ dnsQueryStrategy: e.target.value as any })}
-                                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                            disabled={isConnected}
+                                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <option value="UseIP">UseIP</option>
                                             <option value="UseIPv4">UseIPv4</option>
@@ -592,7 +589,8 @@ export const SettingsView = () => {
                                             <label className="text-xs font-medium text-secondary uppercase tracking-wider">{t('net_dns_servers')}</label>
                                             <button
                                                 onClick={() => setShowDnsModal(true)}
-                                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-accent hover:bg-accent/80 text-white rounded text-xs font-medium transition-colors"
+                                                disabled={isConnected}
+                                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-accent hover:bg-accent/80 text-white rounded text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <Plus size={12} />
                                                 {t('net_add_dns')}
@@ -606,8 +604,8 @@ export const SettingsView = () => {
                                                     className={`flex items-center justify-between p-3 rounded-md border transition-all cursor-pointer ${settings.selectedDnsServer === server.label
                                                         ? 'bg-accent/10 border-accent'
                                                         : 'bg-background border-border hover:border-zinc-700'
-                                                        }`}
-                                                    onClick={() => updateSettings({ selectedDnsServer: server.label })}
+                                                        } ${isConnected ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}`}
+                                                    onClick={() => !isConnected && updateSettings({ selectedDnsServer: server.label })}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${settings.selectedDnsServer === server.label ? 'border-accent' : 'border-zinc-600'
@@ -629,8 +627,8 @@ export const SettingsView = () => {
                                                     className={`flex items-center justify-between p-3 rounded-md border transition-all cursor-pointer ${settings.selectedDnsServer === server.label
                                                         ? 'bg-accent/10 border-accent'
                                                         : 'bg-background border-border hover:border-zinc-700'
-                                                        }`}
-                                                    onClick={() => updateSettings({ selectedDnsServer: server.label })}
+                                                        } ${isConnected ? 'opacity-50 pointer-events-none cursor-not-allowed' : ''}`}
+                                                    onClick={() => !isConnected && updateSettings({ selectedDnsServer: server.label })}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${settings.selectedDnsServer === server.label ? 'border-accent' : 'border-zinc-600'
@@ -673,6 +671,7 @@ export const SettingsView = () => {
                                     description="Route all system traffic through VPN (requires Admin privileges)"
                                     checked={settings.tunMode || false}
                                     onChange={(checked) => updateSettings({ tunMode: checked })}
+                                    disabled={isConnected}
                                 />
 
                                 {/* Set System Proxy */}
@@ -681,6 +680,7 @@ export const SettingsView = () => {
                                     description={t('net_set_system_proxy_desc')}
                                     checked={settings.setSystemProxy || false}
                                     onChange={(checked) => updateSettings({ setSystemProxy: checked })}
+                                    disabled={isConnected}
                                 />
 
                                 {/* SOCKS Settings */}
@@ -690,6 +690,7 @@ export const SettingsView = () => {
                                         description={t('net_socks_desc')}
                                         checked={settings.socksEnabled || false}
                                         onChange={(checked) => updateSettings({ socksEnabled: checked })}
+                                        disabled={isConnected}
                                     />
 
                                     {settings.socksEnabled && settings.mode === 'advanced' && (
@@ -703,7 +704,8 @@ export const SettingsView = () => {
                                                         max="65535"
                                                         value={settings.socksPort || 1089}
                                                         onChange={(e) => updateSettings({ socksPort: parseInt(e.target.value) })}
-                                                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                                        disabled={isConnected}
+                                                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                     />
                                                 </div>
                                                 <div>
@@ -730,6 +732,7 @@ export const SettingsView = () => {
                                                 description={t('net_auth_desc')}
                                                 checked={settings.socksAuthEnabled || false}
                                                 onChange={(checked) => updateSettings({ socksAuthEnabled: checked })}
+                                                disabled={isConnected}
                                             />
 
                                             {settings.socksAuthEnabled && (
@@ -800,6 +803,7 @@ export const SettingsView = () => {
                                         description={t('net_http_desc')}
                                         checked={settings.httpEnabled || false}
                                         onChange={(checked) => updateSettings({ httpEnabled: checked })}
+                                        disabled={isConnected}
                                     />
 
                                     {settings.httpEnabled && settings.mode === 'advanced' && (
@@ -812,7 +816,8 @@ export const SettingsView = () => {
                                                     max="65535"
                                                     value={settings.httpPort || 8889}
                                                     onChange={(e) => updateSettings({ httpPort: parseInt(e.target.value) })}
-                                                    className="w-32 bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                                    disabled={isConnected}
+                                                    className="w-32 bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                 />
                                             </div>
 
@@ -898,8 +903,9 @@ export const SettingsView = () => {
                                                     type="text"
                                                     value={settings.browserForwarderAddress || '127.0.0.1'}
                                                     onChange={(e) => updateSettings({ browserForwarderAddress: e.target.value })}
+                                                    disabled={isConnected}
                                                     placeholder="127.0.0.1"
-                                                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm font-mono"
+                                                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                                                 />
                                             </div>
                                             <div>
@@ -910,8 +916,9 @@ export const SettingsView = () => {
                                                     max="65535"
                                                     value={settings.browserForwarderPort || 8088}
                                                     onChange={(e) => updateSettings({ browserForwarderPort: parseInt(e.target.value) })}
+                                                    disabled={isConnected}
                                                     placeholder="8088"
-                                                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                 />
                                             </div>
                                         </div>
@@ -933,7 +940,8 @@ export const SettingsView = () => {
                                     <select
                                         value={settings.routingMode}
                                         onChange={(e) => updateSettings({ routingMode: e.target.value as any })}
-                                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                        disabled={isConnected}
+                                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <option value="global">{t('net_routing_global')}</option>
                                         <option value="bypass-lan">{t('net_routing_bypass_lan')}</option>
@@ -968,7 +976,8 @@ export const SettingsView = () => {
                                                 value="tcping"
                                                 checked={(settings.latencyTestMethod || 'tcping') === 'tcping'}
                                                 onChange={(e) => updateSettings({ latencyTestMethod: e.target.value as any })}
-                                                className="w-4 h-4 text-accent bg-background border-border focus:ring-accent"
+                                                disabled={isConnected}
+                                                className="w-4 h-4 text-accent bg-background border-border focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                                             />
                                             <span className="text-sm text-primary">TCPing</span>
                                         </label>
@@ -979,7 +988,8 @@ export const SettingsView = () => {
                                                 value="icmping"
                                                 checked={(settings.latencyTestMethod || 'tcping') === 'icmping'}
                                                 onChange={(e) => updateSettings({ latencyTestMethod: e.target.value as any })}
-                                                className="w-4 h-4 text-accent bg-background border-border focus:ring-accent"
+                                                disabled={isConnected}
+                                                className="w-4 h-4 text-accent bg-background border-border focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                                             />
                                             <span className="text-sm text-primary">ICMPing</span>
                                         </label>
@@ -996,8 +1006,9 @@ export const SettingsView = () => {
                                         type="text"
                                         value={settings.realPingTestUrl || 'https://www.google.com'}
                                         onChange={(e) => updateSettings({ realPingTestUrl: e.target.value })}
+                                        disabled={isConnected}
                                         placeholder="https://www.google.com"
-                                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm font-mono"
+                                        className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                                     />
                                     <p className="text-xs text-secondary mt-1.5">
                                         {t('net_latency_url_desc')}
@@ -1025,7 +1036,8 @@ export const SettingsView = () => {
                                                     value="none"
                                                     checked={(settings.proxyType || 'none') === 'none'}
                                                     onChange={(e) => updateSettings({ proxyType: e.target.value as any })}
-                                                    className="w-4 h-4 text-accent bg-background border-border focus:ring-accent"
+                                                    disabled={isConnected}
+                                                    className="w-4 h-4 text-accent bg-background border-border focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                                                 />
                                                 <span className="text-sm text-primary">None</span>
                                             </label>
@@ -1036,7 +1048,8 @@ export const SettingsView = () => {
                                                     value="system"
                                                     checked={(settings.proxyType || 'none') === 'system'}
                                                     onChange={(e) => updateSettings({ proxyType: e.target.value as any })}
-                                                    className="w-4 h-4 text-accent bg-background border-border focus:ring-accent"
+                                                    disabled={isConnected}
+                                                    className="w-4 h-4 text-accent bg-background border-border focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                                                 />
                                                 <span className="text-sm text-primary">System Proxy</span>
                                             </label>
@@ -1047,7 +1060,8 @@ export const SettingsView = () => {
                                                     value="custom"
                                                     checked={(settings.proxyType || 'none') === 'custom'}
                                                     onChange={(e) => updateSettings({ proxyType: e.target.value as any })}
-                                                    className="w-4 h-4 text-accent bg-background border-border focus:ring-accent"
+                                                    disabled={isConnected}
+                                                    className="w-4 h-4 text-accent bg-background border-border focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
                                                 />
                                                 <span className="text-sm text-primary">Custom Proxy</span>
                                             </label>
@@ -1060,7 +1074,7 @@ export const SettingsView = () => {
                                                     <select
                                                         value={settings.proxyType === 'system' ? 'http' : (settings.customProxyType || 'http')}
                                                         onChange={(e) => updateSettings({ customProxyType: e.target.value as any })}
-                                                        disabled={settings.proxyType === 'system'}
+                                                        disabled={isConnected || settings.proxyType === 'system'}
                                                         className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         <option value="http">HTTP</option>
@@ -1074,7 +1088,7 @@ export const SettingsView = () => {
                                                             type="text"
                                                             value={settings.proxyType === 'system' ? '127.0.0.1' : (settings.customProxyServer || '127.0.0.1')}
                                                             onChange={(e) => updateSettings({ customProxyServer: e.target.value })}
-                                                            disabled={settings.proxyType === 'system'}
+                                                            disabled={isConnected || settings.proxyType === 'system'}
                                                             placeholder="127.0.0.1"
                                                             className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                                                         />
@@ -1087,7 +1101,7 @@ export const SettingsView = () => {
                                                             max="65535"
                                                             value={settings.proxyType === 'system' ? 8000 : (settings.customProxyPort || 8000)}
                                                             onChange={(e) => updateSettings({ customProxyPort: parseInt(e.target.value) })}
-                                                            disabled={settings.proxyType === 'system'}
+                                                            disabled={isConnected || settings.proxyType === 'system'}
                                                             placeholder="8000"
                                                             className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                         />
@@ -1146,7 +1160,8 @@ export const SettingsView = () => {
                                             <select
                                                 value={settings.logLevel}
                                                 onChange={(e) => updateSettings({ logLevel: e.target.value as any })}
-                                                className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                                disabled={isConnected}
+                                                className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <option value="none">None</option>
                                                 <option value="info">Info</option>
@@ -1162,6 +1177,7 @@ export const SettingsView = () => {
                                                 description="Multiplexing for better performance"
                                                 checked={settings.muxEnabled}
                                                 onChange={(checked) => updateSettings({ muxEnabled: checked })}
+                                                disabled={isConnected}
                                             />
                                             {settings.muxEnabled && (
                                                 <div className="ml-6 pl-4 border-l-2 border-accent/30">
@@ -1172,7 +1188,8 @@ export const SettingsView = () => {
                                                         max="32"
                                                         value={settings.muxConcurrency}
                                                         onChange={(e) => updateSettings({ muxConcurrency: parseInt(e.target.value) })}
-                                                        className="w-32 bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                                        disabled={isConnected}
+                                                        className="w-32 bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                     />
                                                 </div>
                                             )}
@@ -1235,6 +1252,7 @@ export const SettingsView = () => {
                                                 description={t('net_latency_period_desc')}
                                                 checked={settings.testLatencyPeriodically || false}
                                                 onChange={(checked) => updateSettings({ testLatencyPeriodically: checked })}
+                                                disabled={isConnected}
                                             />
 
                                             <ToggleRow
@@ -1242,6 +1260,7 @@ export const SettingsView = () => {
                                                 description={t('net_latency_connected_desc')}
                                                 checked={settings.testLatencyOnConnected || false}
                                                 onChange={(checked) => updateSettings({ testLatencyOnConnected: checked })}
+                                                disabled={isConnected}
                                             />
 
                                             <ToggleRow
@@ -1249,6 +1268,7 @@ export const SettingsView = () => {
                                                 description={t('net_disable_root_certs_desc')}
                                                 checked={settings.disableSystemRootCerts || false}
                                                 onChange={(checked) => updateSettings({ disableSystemRootCerts: checked })}
+                                                disabled={isConnected}
                                             />
                                         </div>
                                     </div>
@@ -1271,6 +1291,7 @@ export const SettingsView = () => {
                                                     description={t('net_force_direct_desc')}
                                                     checked={settings.forceDirectConnection || false}
                                                     onChange={(checked) => updateSettings({ forceDirectConnection: checked })}
+                                                    disabled={isConnected}
                                                 />
 
                                                 <ToggleRow
@@ -1278,6 +1299,7 @@ export const SettingsView = () => {
                                                     description={t('net_bypass_private_desc')}
                                                     checked={settings.bypassPrivateAddresses || false}
                                                     onChange={(checked) => updateSettings({ bypassPrivateAddresses: checked })}
+                                                    disabled={isConnected}
                                                 />
 
                                                 <ToggleRow
@@ -1285,6 +1307,7 @@ export const SettingsView = () => {
                                                     description={t('net_bypass_cn_desc')}
                                                     checked={settings.bypassCnMainland || false}
                                                     onChange={(checked) => updateSettings({ bypassCnMainland: checked })}
+                                                    disabled={isConnected}
                                                 />
 
                                                 <ToggleRow
@@ -1292,6 +1315,7 @@ export const SettingsView = () => {
                                                     description={t('net_bypass_bt_desc')}
                                                     checked={settings.bypassBittorrent || false}
                                                     onChange={(checked) => updateSettings({ bypassBittorrent: checked })}
+                                                    disabled={isConnected}
                                                 />
 
                                                 <ToggleRow
@@ -1299,6 +1323,7 @@ export const SettingsView = () => {
                                                     description={t('net_use_v2ray_dns_desc')}
                                                     checked={settings.useV2rayDnsForDirect || false}
                                                     onChange={(checked) => updateSettings({ useV2rayDnsForDirect: checked })}
+                                                    disabled={isConnected}
                                                 />
 
                                                 <ToggleRow
@@ -1306,6 +1331,7 @@ export const SettingsView = () => {
                                                     description={t('net_dns_intercept_desc')}
                                                     checked={settings.dnsIntercept || false}
                                                     onChange={(checked) => updateSettings({ dnsIntercept: checked })}
+                                                    disabled={isConnected}
                                                 />
                                             </div>
                                         </div>
@@ -1317,6 +1343,7 @@ export const SettingsView = () => {
                                                 description={t('net_forward_proxy_desc')}
                                                 checked={settings.forwardProxyEnabled || false}
                                                 onChange={(checked) => updateSettings({ forwardProxyEnabled: checked })}
+                                                disabled={isConnected}
                                             />
 
                                             {settings.forwardProxyEnabled && (
@@ -1326,7 +1353,8 @@ export const SettingsView = () => {
                                                         <select
                                                             value={settings.forwardProxyType || 'http'}
                                                             onChange={(e) => updateSettings({ forwardProxyType: e.target.value as any })}
-                                                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                                            disabled={isConnected}
+                                                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                         >
                                                             <option value="http">http</option>
                                                             <option value="socks5">socks5</option>
@@ -1339,8 +1367,9 @@ export const SettingsView = () => {
                                                             type="text"
                                                             value={settings.forwardProxyHost || ''}
                                                             onChange={(e) => updateSettings({ forwardProxyHost: e.target.value })}
+                                                            disabled={isConnected}
                                                             placeholder="Enter host address"
-                                                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm font-mono"
+                                                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed"
                                                         />
                                                     </div>
 
@@ -1352,8 +1381,9 @@ export const SettingsView = () => {
                                                             max="65535"
                                                             value={settings.forwardProxyPort || 1}
                                                             onChange={(e) => updateSettings({ forwardProxyPort: parseInt(e.target.value) })}
+                                                            disabled={isConnected}
                                                             placeholder="1"
-                                                            className="w-32 bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                                            className="w-32 bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                         />
                                                     </div>
 
@@ -1362,6 +1392,7 @@ export const SettingsView = () => {
                                                         description={t('net_auth_desc')}
                                                         checked={settings.forwardProxyAuthEnabled || false}
                                                         onChange={(checked) => updateSettings({ forwardProxyAuthEnabled: checked })}
+                                                        disabled={isConnected}
                                                     />
 
                                                     {settings.forwardProxyAuthEnabled && (
@@ -1372,8 +1403,9 @@ export const SettingsView = () => {
                                                                     type="text"
                                                                     value={settings.forwardProxyUsername || ''}
                                                                     onChange={(e) => updateSettings({ forwardProxyUsername: e.target.value })}
+                                                                    disabled={isConnected}
                                                                     placeholder="Enter username"
-                                                                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                                                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 />
                                                             </div>
                                                             <div>
@@ -1382,8 +1414,9 @@ export const SettingsView = () => {
                                                                     type="password"
                                                                     value={settings.forwardProxyPassword || ''}
                                                                     onChange={(e) => updateSettings({ forwardProxyPassword: e.target.value })}
+                                                                    disabled={isConnected}
                                                                     placeholder="Enter password"
-                                                                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm"
+                                                                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-primary focus:outline-none focus:border-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                                                 />
                                                             </div>
                                                         </div>
@@ -1661,8 +1694,41 @@ export const SettingsView = () => {
                     title="Terms of Use"
                     content={TERMS_OF_USE}
                 />
+
+
+
+                {/* Restart Required Modal */}
+                {showRestartModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                        <div className="bg-surface border border-border rounded-lg p-6 w-[400px] shadow-xl">
+                            <div className="flex items-center gap-3 mb-4">
+                                <Shield size={24} className="text-accent" />
+                                <h3 className="text-lg font-semibold text-primary">Restart Required</h3>
+                            </div>
+                            <p className="text-secondary text-sm mb-6">
+                                Changing the administrator privilege setting requires the application to be restarted to apply changes.
+                                <br /><br />
+                                Please restart the application manually.
+                            </p>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowRestartModal(false)
+                                        // Relaunch App
+                                        import('@tauri-apps/plugin-process').then(({ relaunch }) => {
+                                            relaunch()
+                                        })
+                                    }}
+                                    className="px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-md transition-colors"
+                                >
+                                    Restart App
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-        </div >
+        </div>
     )
 }
 

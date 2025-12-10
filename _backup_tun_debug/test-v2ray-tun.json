@@ -1,0 +1,107 @@
+{
+    "log": {
+        "loglevel": "info"
+    },
+    "dns": {
+        "servers": [
+            "1.1.1.1",
+            "1.0.0.1"
+        ]
+    },
+    "inbounds": [
+        {
+            "tag": "tun-in",
+            "port": 0,
+            "protocol": "tun",
+            "settings": {
+                "name": "v2ray_tun",
+                "mtu": 9000,
+                "ips": [
+                    {
+                        "ip": [
+                            172,
+                            19,
+                            0,
+                            1
+                        ],
+                        "prefix": 30
+                    }
+                ],
+                "routes": [
+                    {
+                        "ip": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        "prefix": 0
+                    }
+                ],
+                "enablePromiscuousMode": true,
+                "enableSpoofing": true,
+                "packetEncoding": "Packet"
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": [
+                    "http",
+                    "tls"
+                ]
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "tag": "proxy",
+            "protocol": "vless",
+            "settings": {
+                "vnext": [
+                    {
+                        "address": "sg.panel.zenyypriv.ggff.net",
+                        "port": 443,
+                        "users": [
+                            {
+                                "id": "25cd34d7-0212-43fe-b960-6fee87f98c75",
+                                "encryption": "none"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "tls",
+                "tlsSettings": {
+                    "allowInsecure": true,
+                    "serverName": "aka.ms"
+                }
+            }
+        },
+        {
+            "tag": "direct",
+            "protocol": "freedom"
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole"
+        }
+    ],
+    "routing": {
+        "domainStrategy": "AsIs",
+        "rules": [
+            {
+                "type": "field",
+                "port": "53",
+                "outboundTag": "direct"
+            },
+            {
+                "type": "field",
+                "inboundTag": [
+                    "tun-in"
+                ],
+                "outboundTag": "proxy"
+            }
+        ]
+    }
+}

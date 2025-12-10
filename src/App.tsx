@@ -50,7 +50,7 @@ const PageTransition = ({ children }: { children: React.ReactNode }) => (
 
 function App() {
     const [isSidebarOpen, setSidebarOpen] = useState(true)
-    const [isAdmin, setIsAdmin] = useState(false)
+    const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
     const [appVersion, setAppVersion] = useState('')
     const { settings } = useApp()
 
@@ -72,13 +72,17 @@ function App() {
     useEffect(() => {
         const init = async () => {
             try {
-                const result = await window.system.checkAdmin()
-                setIsAdmin(result.isAdmin)
+                const { invoke } = await import('@tauri-apps/api/core')
 
-                const ver = await window.system.getVersion()
+                const adminResult = await invoke<boolean>('check_is_admin')
+                setIsAdmin(adminResult)
+
+                const ver = await invoke<string>('get_version')
                 setAppVersion(ver)
             } catch (error) {
                 console.error('Failed to init system info:', error)
+                // Fallback to false if check fails, so user can try to restart if needed
+                if (isAdmin === null) setIsAdmin(false)
             }
         }
         init()
@@ -86,14 +90,21 @@ function App() {
 
     const handleRestartAsAdmin = async () => {
         try {
-            const result = await window.system.restartAsAdmin()
-            if (result && !result.success) {
-                console.error('Failed to restart as admin:', result.error)
-            }
+            const { invoke } = await import('@tauri-apps/api/core')
+            await invoke('restart_as_admin')
         } catch (error) {
             console.error('Failed to restart as admin (exception):', error)
         }
     }
+
+    // Disable Context Menu
+    useEffect(() => {
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault()
+        }
+        document.addEventListener('contextmenu', handleContextMenu)
+        return () => document.removeEventListener('contextmenu', handleContextMenu)
+    }, [])
 
     // Apply theme to document root
     useEffect(() => {
@@ -124,94 +135,102 @@ function App() {
             <ErrorRecovery />
             <CommandPalette />
 
-            {/* Admin Privilege Banner - Only show if TUN mode is enabled and not admin */}
-            {!isAdmin && settings.tunMode && (
-                <AdminPrivilegeBanner onRestartAsAdmin={handleRestartAsAdmin} />
-            )}
-
-            {/* Update Notification Banner */}
-            {updateAvailable && !dismissed && (
-                <UpdateNotificationBanner
-                    version={latestVersion}
-                    downloadUrl={downloadUrl}
-                    downloading={downloading}
-                    downloadProgress={downloadProgress}
-                    updateDownloaded={updateDownloaded}
-                    onDownload={downloadUpdate}
-                    onInstall={installUpdate}
-                    onDismiss={dismissUpdate}
-                />
-            )}
-
-            <div className="flex h-screen w-screen bg-background text-primary overflow-hidden font-sans selection:bg-accent selection:text-white">
-                {/* Titlebar */}
+            <div className="flex flex-col h-screen w-screen bg-background text-primary overflow-hidden font-sans selection:bg-accent selection:text-white">
+                {/* Titlebar - Absolute, sits on top */}
                 <TitleBar />
 
-                {/* Sidebar */}
-                <motion.aside
-                    initial={{ x: 0, opacity: 1 }}
-                    animate={{ width: isSidebarOpen ? 240 : 64 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="h-full bg-surface border-r border-border flex flex-col z-40 pt-10"
-                >
-                    <div className={`px-4 mb-8 flex items-center ${isSidebarOpen ? 'justify-between' : 'justify-center'} h-8`}>
-                        {isSidebarOpen && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="flex items-center gap-2"
-                            >
-                                <Shield size={18} className="text-accent" />
-                                <span className="font-semibold text-sm tracking-wide text-primary">V-NEXUS</span>
-                            </motion.div>
-                        )}
-                        <button
-                            onClick={() => setSidebarOpen(!isSidebarOpen)}
-                            className="p-1.5 hover:bg-white/5 rounded-md text-secondary hover:text-primary transition-all hover-lift app-region-no-drag"
-                        >
-                            <Menu size={16} />
-                        </button>
-                    </div>
+                {/* Banners Container - Pushes content down */}
+                <div className="flex flex-col shrink-0 z-40">
+                    {/* Admin Privilege Banner - Has built-in mt-8 to clear TitleBar */}
+                    {isAdmin === false && settings.tunMode && (
+                        <AdminPrivilegeBanner onRestartAsAdmin={handleRestartAsAdmin} />
+                    )}
 
-                    <nav className="flex-1 px-2 space-y-1">
-                        {navItems.map((item, index) => (
-                            <motion.div
-                                key={item.to}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: index * 0.05, duration: 0.2 }}
-                            >
-                                <NavItem to={item.to} icon={item.icon} label={item.label} isOpen={isSidebarOpen} />
-                            </motion.div>
-                        ))}
-                    </nav>
+                    {/* Update Notification Banner */}
+                    {updateAvailable && !dismissed && (
+                        <div className={isAdmin === false && settings.tunMode ? '' : 'mt-8'}>
+                            <UpdateNotificationBanner
+                                version={latestVersion}
+                                downloadUrl={downloadUrl}
+                                downloading={downloading}
+                                downloadProgress={downloadProgress}
+                                updateDownloaded={updateDownloaded}
+                                onDownload={downloadUpdate}
+                                onInstall={installUpdate}
+                                onDismiss={dismissUpdate}
+                            />
+                        </div>
+                    )}
+                </div>
 
-                    <div className="p-4 border-t border-border">
-                        {isSidebarOpen ? (
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded bg-accent/10 flex items-center justify-center text-accent">
+                {/* Main Content Area - Fills remaining space */}
+                <div className="flex-1 flex overflow-hidden relative">
+                    {/* Sidebar */}
+                    <motion.aside
+                        initial={{ x: 0, opacity: 1 }}
+                        animate={{ width: isSidebarOpen ? 240 : 64 }}
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        className="h-full bg-surface border-r border-border flex flex-col z-30 pt-10"
+                    >
+                        <div className={`px-4 mb-8 flex items-center ${isSidebarOpen ? 'justify-between' : 'justify-center'} h-8`}>
+                            {isSidebarOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="flex items-center gap-2"
+                                >
+                                    <Shield size={18} className="text-accent" />
+                                    <span className="font-semibold text-sm tracking-wide text-primary">V-NEXUS</span>
+                                </motion.div>
+                            )}
+                            <button
+                                onClick={() => setSidebarOpen(!isSidebarOpen)}
+                                className="p-1.5 hover:bg-white/5 rounded-md text-secondary hover:text-primary transition-all hover-lift app-region-no-drag"
+                            >
+                                <Menu size={16} />
+                            </button>
+                        </div>
+
+                        <nav className="flex-1 px-2 space-y-1">
+                            {navItems.map((item, index) => (
+                                <motion.div
+                                    key={item.to}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.05, duration: 0.2 }}
+                                >
+                                    <NavItem to={item.to} icon={item.icon} label={item.label} isOpen={isSidebarOpen} />
+                                </motion.div>
+                            ))}
+                        </nav>
+
+                        <div className="p-4 border-t border-border">
+                            {isSidebarOpen ? (
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded bg-accent/10 flex items-center justify-center text-accent">
+                                        <Shield size={16} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-medium text-primary">V-Nexus</span>
+                                        <span className="text-[10px] text-secondary">v{appVersion}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-8 h-8 mx-auto rounded bg-accent/10 flex items-center justify-center text-accent">
                                     <Shield size={16} />
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-medium text-primary">V-Nexus</span>
-                                    <span className="text-[10px] text-secondary">v{appVersion}</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="w-8 h-8 mx-auto rounded bg-accent/10 flex items-center justify-center text-accent">
-                                <Shield size={16} />
-                            </div>
-                        )}
-                    </div>
-                </motion.aside>
+                            )}
+                        </div>
+                    </motion.aside>
 
-                {/* Main Content */}
-                <main className="flex-1 h-full overflow-hidden bg-background relative pt-10 pr-0">
-                    <div className="w-full h-full">
-                        <AnimatedRoutes />
-                    </div>
-                </main>
+                    {/* Main View */}
+                    <main className="flex-1 h-full overflow-hidden bg-background relative pt-10 pr-0">
+                        <div className="w-full h-full">
+                            <AnimatedRoutes />
+                        </div>
+                    </main>
+                </div>
             </div>
         </Router>
     )

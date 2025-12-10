@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { connectionService } from '../services/ConnectionService'
 import { useApp } from '../contexts/AppContext'
 import { useToast } from '../contexts/ToastContext'
 
@@ -77,12 +78,11 @@ export const useReconnect = () => {
                 await new Promise(resolve => setTimeout(resolve, delay))
 
                 try {
-                    const result = await window.xray.start(profile, settings)
+                    const result = await connectionService.connect(profile, settings, (msg) => console.log(msg), null)
 
                     if (result.success) {
                         setConnected(true)
                         setActiveProfile(profile.id)
-                        window.electronApp?.sendConnectionStatus(true)
                         showToast(`Reconnected to ${profile.name}`, 'success')
 
                         // Resolve IP for stats

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { useApp } from '../contexts/AppContext'
 
 export const useRealStats = () => {
@@ -10,8 +11,7 @@ export const useRealStats = () => {
         const interval = setInterval(async () => {
             try {
                 // Get real memory usage
-                const memoryResult = await window.system.getMemory()
-                const memory = memoryResult.success ? memoryResult.memory : 0
+                const memory = await invoke<number>('get_memory_usage')
 
                 updateStats({
                     memoryUsage: memory

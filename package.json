@@ -1,36 +1,34 @@
 {
     "name": "v-nexus",
     "private": true,
-    "version": "2.0.0",
-    "main": "dist-electron/main.js",
+    "version": "3.0.0",
     "scripts": {
-        "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
-        "dev:vite": "vite",
-        "dev:electron": "wait-on tcp:5173 && npm run build:electron && cross-env NODE_ENV=development electron .",
-        "build:electron": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --outdir=dist-electron --external:electron",
-        "build": "tsc && npm run build:electron && vite build && electron-builder",
+        "dev": "vite",
+        "build": "tsc && vite build",
         "preview": "vite preview",
-        "build:vite": "tsc && vite build",
         "tauri": "tauri",
         "dev:tauri": "tauri dev",
         "build:tauri": "tauri build"
     },
     "dependencies": {
-        "@grpc/grpc-js": "^1.14.2",
-        "@grpc/proto-loader": "^0.8.0",
+        "@tauri-apps/api": "^2.9.1",
+        "@tauri-apps/plugin-autostart": "^2.5.1",
+        "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
+        "@tauri-apps/plugin-dialog": "^2.4.2",
+        "@tauri-apps/plugin-fs": "^2.4.4",
+        "@tauri-apps/plugin-http": "^2.5.4",
+        "@tauri-apps/plugin-process": "^2.3.1",
+        "@tauri-apps/plugin-shell": "^2.3.3",
+        "@tauri-apps/plugin-updater": "^2.9.0",
         "clsx": "^2.1.0",
-        "default-gateway": "^7.2.2",
-        "electron-log": "^5.4.3",
-        "electron-squirrel-startup": "^1.0.1",
-        "electron-updater": "^6.6.2",
         "framer-motion": "^11.0.8",
         "html5-qrcode": "^2.3.8",
         "lucide-react": "^0.344.0",
         "qrcode": "^1.5.4",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
+        "react-easy-crop": "^5.5.6",
         "react-router-dom": "^6.22.3",
-        "sudo-prompt": "^9.2.1",
         "uuid": "^9.0.1",
         "zustand": "^4.5.2"
     },
@@ -43,56 +41,11 @@
         "@types/uuid": "^9.0.8",
         "@vitejs/plugin-react": "^4.2.1",
         "autoprefixer": "^10.4.22",
-        "concurrently": "^8.2.2",
-        "cross-env": "^7.0.3",
-        "electron": "^39.2.6",
-        "electron-builder": "^24.13.3",
         "postcss": "^8.4.35",
         "tailwindcss": "^3.4.1",
-        "vite": "^5.1.4",
-        "wait-on": "^7.2.0"
+        "typescript": "^5.9.3",
+        "vite": "^5.1.4"
     },
     "author": "Lahiru Rashmika",
-    "description": "V-Nexus V2Ray Client",
-    "build": {
-        "files": [
-            "dist/**/*",
-            "dist-electron/**/*",
-            "!resources/**/*",
-            "!node_modules/**/*",
-            "!**/*.map"
-        ],
-        "appId": "com.vnexus.app",
-        "productName": "V-Nexus",
-        "nsis": {
-            "oneClick": false,
-            "allowToChangeInstallationDirectory": true,
-            "perMachine": true,
-            "deleteAppDataOnUninstall": true
-        },
-        "win": {
-            "icon": "resources/icon.png",
-            "requestedExecutionLevel": "asInvoker"
-        },
-        "compression": "maximum",
-        "asar": true,
-        "extraResources": [
-            {
-                "from": "resources",
-                "to": "xray",
-                "filter": [
-                    "xray.exe",
-                    "geoip.dat",
-                    "geosite.dat"
-                ]
-            },
-            {
-                "from": "resources/tun2socks",
-                "to": "tun2socks",
-                "filter": [
-                    "**/*"
-                ]
-            }
-        ]
-    }
+    "description": "V-Nexus V2Ray Client"
 }

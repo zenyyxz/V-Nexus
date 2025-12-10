@@ -2,6 +2,10 @@ import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Download } from 'lucide-react'
 import QRCode from 'qrcode'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { save } from '@tauri-apps/plugin-dialog'
+import { writeFile } from '@tauri-apps/plugin-fs'
+import { useToast } from '../contexts/ToastContext'
 
 interface QRCodeModalProps {
     data: string
@@ -11,8 +15,15 @@ interface QRCodeModalProps {
 
 export const QRCodeModal = ({ data, title, onClose }: QRCodeModalProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null)
+    const { showToast } = useToast()
 
-    // ... (useEffect for Escape key)
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose()
+        }
+        window.addEventListener('keydown', handleEscape)
+        return () => window.removeEventListener('keydown', handleEscape)
+    }, [onClose])
 
     useEffect(() => {
         if (!canvasRef.current) return
@@ -29,13 +40,41 @@ export const QRCodeModal = ({ data, title, onClose }: QRCodeModalProps) => {
         })
     }, [data])
 
-    const handleDownload = () => {
+    const handleCopy = async () => {
+        try {
+            await writeText(data)
+            showToast('URI copied to clipboard', 'success')
+        } catch (err) {
+            console.error('Failed to copy:', err)
+            showToast('Failed to copy to clipboard', 'error')
+        }
+    }
+
+    const handleDownload = async () => {
         if (!canvasRef.current) return
-        const url = canvasRef.current.toDataURL('image/png')
-        const link = document.createElement('a')
-        link.download = `${title.replace(/\s+/g, '_')}_QR.png`
-        link.href = url
-        link.click()
+        try {
+            const dataUrl = canvasRef.current.toDataURL('image/png')
+            const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '')
+            const binaryString = atob(base64Data)
+            const bytes = new Uint8Array(binaryString.length)
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i)
+            }
+
+            const sanitizedTitle = title.replace(/[^a-zA-Z0-9-_]/g, '_')
+            const filePath = await save({
+                filters: [{ name: 'PNG Image', extensions: ['png'] }],
+                defaultPath: `${sanitizedTitle}_QR.png`
+            })
+
+            if (filePath) {
+                await writeFile(filePath, bytes)
+                showToast('QR Code saved successfully', 'success')
+            }
+        } catch (err) {
+            console.error('Failed to save QR:', err)
+            showToast('Failed to save QR code', 'error')
+        }
     }
 
     return (
@@ -61,7 +100,7 @@ export const QRCodeModal = ({ data, title, onClose }: QRCodeModalProps) => {
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-primary">{title}</h3>
+                        <h3 className="text-lg font-semibold text-primary truncate pr-4">{title}</h3>
                         <button
                             onClick={onClose}
                             className="p-1.5 hover:bg-white/5 rounded transition-all hover-lift text-secondary hover:text-primary"
@@ -83,16 +122,14 @@ export const QRCodeModal = ({ data, title, onClose }: QRCodeModalProps) => {
                         />
                     </motion.div>
 
-                    <div className="bg-background border border-border rounded p-3">
+                    <div className="bg-background border border-border rounded p-3 mb-4">
                         <p className="text-xs text-secondary mb-1">Profile URI:</p>
-                        <p className="text-xs font-mono text-primary break-all">{data}</p>
+                        <p className="text-xs font-mono text-primary break-all line-clamp-3 select-all">{data}</p>
                     </div>
 
-                    <div className="mt-4 flex gap-2">
+                    <div className="flex gap-2">
                         <button
-                            onClick={() => {
-                                navigator.clipboard.writeText(data)
-                            }}
+                            onClick={handleCopy}
                             className="flex-1 px-4 py-2 bg-accent hover:bg-accent/80 text-white rounded-md text-sm font-medium transition-all hover-lift shadow-lg"
                         >
                             Copy URI

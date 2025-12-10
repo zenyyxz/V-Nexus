@@ -5,6 +5,7 @@ import QRCode from 'qrcode'
 import { Profile } from '../contexts/AppContext'
 import { generateLockedLink } from '../utils/profile-parser'
 import { useToast } from '../contexts/ToastContext'
+import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 
 interface LockShareModalProps {
     profile: Profile
@@ -23,7 +24,7 @@ export const LockShareModal: React.FC<LockShareModalProps> = ({ profile, onClose
             const link = generateLockedLink(profile, deviceId.trim())
 
             // 1. Copy to clipboard
-            await navigator.clipboard.writeText(link)
+            await writeText(link)
             showToast('Locked profile link copied!', 'success')
 
             // 2. Generate and show QR Code
@@ -145,8 +146,8 @@ export const LockShareModal: React.FC<LockShareModalProps> = ({ profile, onClose
                                 onClick={handleLockAndCopy}
                                 disabled={!deviceId.trim()}
                                 className={`w-full py-3.5 rounded-xl font-medium transition-all shadow-lg shadow-black/20 ${!deviceId.trim()
-                                        ? 'bg-zinc-800/50 text-zinc-500 cursor-not-allowed'
-                                        : 'bg-zinc-800 hover:bg-zinc-700 text-white hover:scale-[1.02] active:scale-[0.98]'
+                                    ? 'bg-zinc-800/50 text-zinc-500 cursor-not-allowed'
+                                    : 'bg-zinc-800 hover:bg-zinc-700 text-white hover:scale-[1.02] active:scale-[0.98]'
                                     }`}
                             >
                                 {qrUrl ? 'Copy Again' : 'Lock and Copy'}

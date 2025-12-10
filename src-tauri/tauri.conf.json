@@ -1,22 +1,24 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "V-Nexus",
-  "version": "0.1.0",
-  "identifier": "com.vnexus.app",
+  "productName": "v-nexus",
+  "version": "3.0.0",
+  "identifier": "com.vnexus.client",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm run dev:vite",
-    "beforeBuildCommand": "npm run build:vite"
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
       {
-        "title": "v-nexus",
-        "width": 800,
-        "height": 600,
-        "resizable": true,
-        "fullscreen": false
+        "title": "V-Nexus",
+        "width": 1000,
+        "height": 700,
+        "fullscreen": false,
+        "resizable": false,
+        "maximizable": false,
+        "decorations": false
       }
     ],
     "security": {
@@ -32,6 +34,26 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "resources": [
+      "resources/xray",
+      "resources/tun2socks"
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/HeaderImage.bmp",
+        "sidebarImage": "icons/SidebarImage.bmp",
+        "installMode": "both"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/zenyyxz/V-Nexus/releases/latest/download/latest.json"
+      ],
+      "pubkey": "RWSRzDfIrRpA1Dzi1TQNQI3LFXgWttCUJrTvasGrvhJtgzk+7IdAJcD"
+    }
   }
 }

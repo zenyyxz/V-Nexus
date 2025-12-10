@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import { check } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
 
 interface UpdateInfo {
     updateAvailable: boolean
@@ -13,13 +15,12 @@ interface UpdateInfo {
     dismissed: boolean
 }
 
-const CURRENT_VERSION = '2.0.0'
 const STORAGE_KEY_DISMISSED = 'update_dismissed_version'
 
 export const useUpdateChecker = (autoCheck: boolean = true) => {
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo>({
         updateAvailable: false,
-        latestVersion: CURRENT_VERSION,
+        latestVersion: '',
         downloadUrl: '',
         releaseNotes: '',
         checking: false,
@@ -30,11 +31,43 @@ export const useUpdateChecker = (autoCheck: boolean = true) => {
         dismissed: false
     })
 
-    // Check for updates
+    const [currentVersion, setCurrentVersion] = useState('2.0.0')
+
+    // Fetch current version from Tauri
+    useEffect(() => {
+        import('@tauri-apps/api/app').then(app => {
+            app.getVersion().then(setCurrentVersion)
+        }).catch(console.error)
+    }, [])
+
     const checkForUpdates = useCallback(async () => {
         try {
             setUpdateInfo(prev => ({ ...prev, checking: true, error: null }))
-            await window.electron.invoke('check-for-updates')
+
+            const update = await check()
+
+            if (update) {
+                console.log(`[Updater] Found update: v${update.version}`)
+                const dismissedVersion = localStorage.getItem(STORAGE_KEY_DISMISSED)
+                const dismissed = dismissedVersion === update.version
+
+                setUpdateInfo(prev => ({
+                    ...prev,
+                    checking: false,
+                    updateAvailable: true,
+                    latestVersion: update.version,
+                    downloadUrl: '', // URL is internal to plugin usually, but we can verify
+                    releaseNotes: update.body || '',
+                    dismissed
+                }))
+            } else {
+                console.log(`[Updater] You are on the latest version.`)
+                setUpdateInfo(prev => ({
+                    ...prev,
+                    checking: false,
+                    updateAvailable: false
+                }))
+            }
         } catch (error) {
             console.error('Failed to check for updates:', error)
             setUpdateInfo(prev => ({
@@ -45,11 +78,46 @@ export const useUpdateChecker = (autoCheck: boolean = true) => {
         }
     }, [])
 
-    // Download update
     const downloadUpdate = useCallback(async () => {
         try {
-            setUpdateInfo(prev => ({ ...prev, downloading: true, error: null }))
-            await window.electron.invoke('download-update')
+            setUpdateInfo(prev => ({ ...prev, downloading: true, error: null, downloadProgress: 0 }))
+
+            const update = await check()
+            if (update) {
+                let downloaded = 0
+                let contentLength = 0
+
+                // Note: The plugin API calls might have changed slightly in v2.
+                // update.downloadAndInstall(cb) is common.
+                // Let's check docs or standard usage.
+                // standard: await update.downloadAndInstall((event) => { ... })
+
+                await update.downloadAndInstall((event: any) => {
+                    switch (event.event) {
+                        case 'Started':
+                            contentLength = event.data.contentLength || 0
+                            // console.log(`[Updater] Started downloading ${contentLength} bytes`)
+                            break;
+                        case 'Progress':
+                            downloaded += event.data.chunkLength
+                            if (contentLength > 0) {
+                                const progress = (downloaded / contentLength) * 100
+                                setUpdateInfo(prev => ({ ...prev, downloadProgress: Math.round(progress) }))
+                            }
+                            break;
+                        case 'Finished':
+                            console.log('[Updater] Download finished')
+                            break;
+                    }
+                })
+
+                setUpdateInfo(prev => ({
+                    ...prev,
+                    downloading: false,
+                    downloadProgress: 100,
+                    updateDownloaded: true
+                }))
+            }
         } catch (error) {
             console.error('Failed to download update:', error)
             setUpdateInfo(prev => ({
@@ -60,12 +128,13 @@ export const useUpdateChecker = (autoCheck: boolean = true) => {
         }
     }, [])
 
-    // Install update
     const installUpdate = useCallback(async () => {
         try {
-            await window.electron.invoke('install-update')
+            // In v2, downloadAndInstall typically handles everything and prepares for restart.
+            // Using `relaunch` to restart.
+            await relaunch()
         } catch (error) {
-            console.error('Failed to install update:', error)
+            console.error('Failed to relaunch:', error)
             setUpdateInfo(prev => ({
                 ...prev,
                 error: error instanceof Error ? error.message : 'Unknown error'
@@ -73,88 +142,14 @@ export const useUpdateChecker = (autoCheck: boolean = true) => {
         }
     }, [])
 
-    // Dismiss update
     const dismissUpdate = useCallback(() => {
         localStorage.setItem(STORAGE_KEY_DISMISSED, updateInfo.latestVersion)
         setUpdateInfo(prev => ({ ...prev, dismissed: true }))
     }, [updateInfo.latestVersion])
 
-    // Listen to IPC events from main process
     useEffect(() => {
-        const handleChecking = () => {
-            setUpdateInfo(prev => ({ ...prev, checking: true }))
-        }
-
-        const handleUpdateAvailable = (info: any) => {
-            const dismissedVersion = localStorage.getItem(STORAGE_KEY_DISMISSED)
-            const dismissed = dismissedVersion === info.version
-
-            setUpdateInfo(prev => ({
-                ...prev,
-                checking: false,
-                updateAvailable: true,
-                latestVersion: info.version,
-                downloadUrl: `https://github.com/zenyyxz/V-Nexus/releases/tag/v${info.version}`,
-                releaseNotes: info.releaseNotes || '',
-                dismissed
-            }))
-        }
-
-        const handleUpdateNotAvailable = () => {
-            setUpdateInfo(prev => ({
-                ...prev,
-                checking: false,
-                updateAvailable: false
-            }))
-        }
-
-        const handleDownloadProgress = (progress: any) => {
-            setUpdateInfo(prev => ({
-                ...prev,
-                downloading: true,
-                downloadProgress: Math.round(progress.percent)
-            }))
-        }
-
-        const handleUpdateDownloaded = () => {
-            setUpdateInfo(prev => ({
-                ...prev,
-                downloading: false,
-                downloadProgress: 100,
-                updateDownloaded: true
-            }))
-        }
-
-        const handleError = (error: any) => {
-            setUpdateInfo(prev => ({
-                ...prev,
-                checking: false,
-                downloading: false,
-                error: error.message
-            }))
-        }
-
-        // Register event listeners
-        window.electron.on('update-checking', handleChecking)
-        window.electron.on('update-available', handleUpdateAvailable)
-        window.electron.on('update-not-available', handleUpdateNotAvailable)
-        window.electron.on('update-download-progress', handleDownloadProgress)
-        window.electron.on('update-downloaded', handleUpdateDownloaded)
-        window.electron.on('update-error', handleError)
-
-        // Auto-check on mount if enabled
         if (autoCheck) {
             checkForUpdates()
-        }
-
-        // Cleanup
-        return () => {
-            window.electron.removeListener('update-checking', handleChecking)
-            window.electron.removeListener('update-available', handleUpdateAvailable)
-            window.electron.removeListener('update-not-available', handleUpdateNotAvailable)
-            window.electron.removeListener('update-download-progress', handleDownloadProgress)
-            window.electron.removeListener('update-downloaded', handleUpdateDownloaded)
-            window.electron.removeListener('update-error', handleError)
         }
     }, [autoCheck, checkForUpdates])
 
@@ -164,6 +159,6 @@ export const useUpdateChecker = (autoCheck: boolean = true) => {
         downloadUpdate,
         installUpdate,
         dismissUpdate,
-        currentVersion: CURRENT_VERSION
+        currentVersion
     }
 }
