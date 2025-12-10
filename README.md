@@ -14,9 +14,9 @@
 
 ---
 
-**V-Nexus** is a next-generation GUI client for Xray Core, built on Electron and React. It is designed to provide a seamless, reliable, and aesthetically pleasing experience for users requiring censorship circumvention and secure tunneling on Windows.
+**V-Nexus** is a next-generation GUI client for Xray Core, built on **Tauri** and React. It is designed to provide a seamless, reliable, and aesthetically pleasing experience for users requiring censorship circumvention and secure tunneling on Windows.
 
-> **Note**: This is the **V3 (Tauri + Rust)** branch. Huge performance upgrades over V2!
+> **Note**: This is the **V3 (Tauri + Rust)** branch. Significant performance upgrades over V2.
 
 ## Key Features
 
@@ -66,5 +66,5 @@ Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
 
 ---
 <div align="center">
-  <sub>Developed with by <a href="https://github.com/zenyyxz">Lahiru Rashmika</a></sub>
+  <sub>Developed by <a href="https://github.com/zenyyxz">Lahiru Rashmika</a></sub>
 </div>
