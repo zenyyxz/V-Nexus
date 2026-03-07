@@ -1,0 +1,3 @@
+/home/zenyy/Documents/Projects/v2ray_client/native_backend/build/CMakeFiles/native_backend.dir
+/home/zenyy/Documents/Projects/v2ray_client/native_backend/build/CMakeFiles/edit_cache.dir
+/home/zenyy/Documents/Projects/v2ray_client/native_backend/build/CMakeFiles/rebuild_cache.dir

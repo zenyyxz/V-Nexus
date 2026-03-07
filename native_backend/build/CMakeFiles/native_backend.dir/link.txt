@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -shared -Wl,--dependency-file=CMakeFiles/native_backend.dir/link.d -Wl,-soname,libnative_backend.so -o libnative_backend.so CMakeFiles/native_backend.dir/src/backend.cpp.o

@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/zenyy/Documents/Projects/v2ray_client/native_backend/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
