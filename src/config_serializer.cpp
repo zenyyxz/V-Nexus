@@ -60,14 +60,14 @@ namespace VNexus {
             server1["server"] = "1.1.1.1";
             server1["server_port"] = 443;
             server1["tag"] = "dns-remote";
-            server1["types"] = "https";
+            server1["type"] = "https";
 
             json server2;
             server2["tag"] = "dns-bootstrap";
             server2["type"] = "local";
 
             json server3;
-            server3["inet_range"] = "198.18.0.0/15";
+            server3["inet4_range"] = "198.18.0.0/15";
             server3["inet6_range"] = "fc00::/18";
             server3["tag"] = "dns-fakeip";
             server3["type"] = "fakeip";
@@ -106,7 +106,7 @@ namespace VNexus {
             outbound1["tls"]["insecure"] = true;
             outbound1["tls"]["server_name"] = "aka.ms";
             outbound1["type"] = "vless";
-            outbound1["uuid"] = "c4bd98c1-b83c-4b32-a086-40f67a7ec3ff";
+            outbound1["uuid"] = "8e22839b-d2d5-40da-bab6-6bde61104c4d";
 
             json outbound2;
             outbound2["tag"] = "direct";
