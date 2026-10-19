@@ -1,6 +1,9 @@
 #include "config_serializer.hpp"
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <iostream>
+
+using json = nlohmann::json;
 
 namespace VNexus {
     namespace Core {
@@ -33,10 +36,118 @@ namespace VNexus {
         }
 
         std::string GenerateSingBoxConfig(const ConfigAttributes &config) {
-            nlohmann::json j;
+            // parent object
+            json j;
             
-            // still under development.
+            j["dns"]["final"] = "dns-remote";
+            j["dns"]["independent_cache"] = true;
+            
+            // rules objects
+            json rule1;
+            rule1["domain"] = {"161.118.248.52"}; // hard coding now to test.
+            rule1["server"] = "dns-bootstrap";
 
+            json rule2;
+            rule2["query_type"] = {"A", "AAAA"};
+            rule2["rewrite_ttl"] = 1;
+            rule2["server"] = "dns-fakeip";
+
+            j["dns"]["rules"] = json::array({rule1, rule2});
+            
+            // servers object
+            json server1;
+            server1["detour"] = "proxy";
+            server1["server"] = "1.1.1.1";
+            server1["server_port"] = 443;
+            server1["tag"] = "dns-remote";
+            server1["types"] = "https";
+
+            json server2;
+            server2["tag"] = "dns-bootstrap";
+            server2["type"] = "local";
+
+            json server3;
+            server3["inet_range"] = "198.18.0.0/15";
+            server3["inet6_range"] = "fc00::/18";
+            server3["tag"] = "dns-fakeip";
+            server3["type"] = "fakeip";
+
+            j["dns"]["servers"] = json::array({server1, server2, server3});
+            j["dns"]["strategy"] = "prefer_ipv4";
+
+            json inbound1;
+            inbound1["address"] = {"172.19.0.1/30"};
+            inbound1["auto_route"] = true;
+            inbound1["interface_name"] = "zen-tun";
+            inbound1["mtu"] = 1400;
+            inbound1["route_exclude_address"] = {"127.0.0.1/8", "161.118.248.52/32"};
+            inbound1["stack"] = "system";
+            inbound1["strict_route"] = true;
+            inbound1["tag"] = "tun-in";
+            inbound1["type"] = "tun";
+
+            json inbound2;
+            inbound2["listen"] = "127.0.0.1";
+            inbound2["listen_port"] = 53;
+            inbound2["tag"] = "dns-in";
+            inbound2["type"] = "direct";
+
+            j["inbounds"] = json::array({inbound1, inbound2});
+
+            j["log"]["level"] = "info";
+            j["log"]["output"] = "/home/zendx/Documents/vnexus/box.log";
+            j["log"]["timestamp"] = true;
+
+            json outbound1;
+            outbound1["server"] = "161.118.248.52";
+            outbound1["server_port"] = 443;
+            outbound1["tag"] = "proxy";
+            outbound1["tls"]["enabled"] = true;
+            outbound1["tls"]["insecure"] = true;
+            outbound1["tls"]["server_name"] = "aka.ms";
+
+            json outbound2;
+            outbound2["tag"] = "direct";
+            outbound2["type"] = "direct";
+
+            j["outbounds"] = json::array({outbound1, outbound2});
+
+            j["route"]["auto_detect_interface"] = true;
+            j["route"]["default_domain_resolver"] = "dns-bootstrap";
+            j["route"]["final"] = "proxy";
+
+            json routeRule1;
+            routeRule1["action"] = "hijack-dns";
+            routeRule1["protocol"] = "dns";
+
+            json routeRule2;
+            routeRule2["action"] = "hijack-dns";
+            routeRule2["port"] = 53;
+
+            json routeRule3;
+            routeRule3["action"] = "route";
+            routeRule3["domain"] = {"161.118.248.52"};
+            routeRule3["outbound"] = "direct";
+
+            json routeRule4;
+            routeRule4["action"] = "sniff";
+            routeRule4["inbound"] = {"tun-in"};
+            routeRule4["protocol"] = {"http", "tls", "quic"};
+
+            j["rules"] = json::array({routeRule1, routeRule2, routeRule3, routeRule4});
+
+            return j.dump(2);
+        }
+
+        bool SaveConfigFile(const ConfigAttributes &config, const std::string &filepath) {
+            std::ofstream file("config.json");
+
+            if (!file.is_open()) {
+                std::cerr << "File couldn't be opened.\n";
+            }
+            file << GenerateSingBoxConfig(config);
+            file.close();
+            return true;
         }
     }
 }

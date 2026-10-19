@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SOURCES 
     src/main.cpp
     src/cli.cpp
+    src/config_serializer.cpp
 )
 
 include_directories(include)
