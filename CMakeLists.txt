@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(vnexusCLI)
+project(vnexus)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,4 +14,4 @@ set(HEADERS # this one is completely optional btw since we have "include_directo
     include/cli.hpp
 )
 
-add_executable(vnexusCLI ${SOURCES})
+add_executable(vnexus ${SOURCES})
