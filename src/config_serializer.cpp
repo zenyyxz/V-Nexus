@@ -44,7 +44,7 @@ namespace VNexus {
             
             // rules objects
             json rule1;
-            rule1["domain"] = {"161.118.248.52"}; // hard coding now to test.
+            rule1["domain"] = {config.server};
             rule1["server"] = "dns-bootstrap";
 
             json rule2;
@@ -78,35 +78,35 @@ namespace VNexus {
             json inbound1;
             inbound1["address"] = {"172.19.0.1/30"};
             inbound1["auto_route"] = true;
-            inbound1["interface_name"] = "zen-tun";
-            inbound1["mtu"] = 1400;
-            inbound1["route_exclude_address"] = {"127.0.0.0/8", "161.118.248.52/32"};
-            inbound1["stack"] = "system";
-            inbound1["strict_route"] = true;
+            inbound1["interface_name"] = config.tunInterfaceName;
+            inbound1["mtu"] = config.mtu;
+            inbound1["route_exclude_address"] = {"127.0.0.0/8", config.server_ip + "/32"};
+            inbound1["stack"] = config.tunStack;
+            inbound1["strict_route"] = config.strict_route;
             inbound1["tag"] = "tun-in";
             inbound1["type"] = "tun";
 
             json inbound2;
-            inbound2["listen"] = "127.0.0.1";
-            inbound2["listen_port"] = 53;
+            inbound2["listen"] = config.listen;
+            inbound2["listen_port"] = config.listen_port;
             inbound2["tag"] = "dns-in";
             inbound2["type"] = "direct";
 
             j["inbounds"] = json::array({inbound1, inbound2});
 
-            j["log"]["level"] = "info";
-            j["log"]["output"] = "/home/zendx/Documents/vnexus/box.log";
-            j["log"]["timestamp"] = true;
+            j["log"]["level"] = toString(config.logLevel);
+            j["log"]["output"] = config.logFilePath;
+            j["log"]["timestamp"] = config.logTimeStamps;
 
             json outbound1;
-            outbound1["server"] = "161.118.248.52";
-            outbound1["server_port"] = 443;
+            outbound1["server"] = config.server;
+            outbound1["server_port"] = config.server_port;
             outbound1["tag"] = "proxy";
-            outbound1["tls"]["enabled"] = true;
-            outbound1["tls"]["insecure"] = true;
-            outbound1["tls"]["server_name"] = "aka.ms";
-            outbound1["type"] = "vless";
-            outbound1["uuid"] = "8e22839b-d2d5-40da-bab6-6bde61104c4d";
+            outbound1["tls"]["enabled"] = config.tls_enabled;
+            outbound1["tls"]["insecure"] = config.allowInSecure;
+            outbound1["tls"]["server_name"] = config.SNI;
+            outbound1["type"] = toString(config.vpnProtocol);
+            outbound1["uuid"] = config.uuid;
 
             json outbound2;
             outbound2["tag"] = "direct";
@@ -128,12 +128,12 @@ namespace VNexus {
 
             json routeRule3;
             routeRule3["action"] = "route";
-            routeRule3["domain"] = {"161.118.248.52"};
+            routeRule3["domain"] = {config.server};
             routeRule3["outbound"] = "direct";
 
             json routeRule4;
             routeRule4["action"] = "route";
-            routeRule4["ip_cidr"] = {"161.118.248.52/32"};
+            routeRule4["ip_cidr"] = {config.server_ip + "/32"};
             routeRule4["outbound"] = "direct";
 
             json routeRule5;
@@ -158,5 +158,4 @@ namespace VNexus {
         }
     }
 }
-
 
