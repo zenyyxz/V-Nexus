@@ -80,7 +80,7 @@ namespace VNexus {
             inbound1["auto_route"] = true;
             inbound1["interface_name"] = "zen-tun";
             inbound1["mtu"] = 1400;
-            inbound1["route_exclude_address"] = {"127.0.0.1/8", "161.118.248.52/32"};
+            inbound1["route_exclude_address"] = {"127.0.0.0/8", "161.118.248.52/32"};
             inbound1["stack"] = "system";
             inbound1["strict_route"] = true;
             inbound1["tag"] = "tun-in";
