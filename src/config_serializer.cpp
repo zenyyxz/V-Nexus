@@ -105,6 +105,8 @@ namespace VNexus {
             outbound1["tls"]["enabled"] = true;
             outbound1["tls"]["insecure"] = true;
             outbound1["tls"]["server_name"] = "aka.ms";
+            outbound1["type"] = "vless";
+            outbound1["uuid"] = "c4bd98c1-b83c-4b32-a086-40f67a7ec3ff";
 
             json outbound2;
             outbound2["tag"] = "direct";
@@ -130,11 +132,16 @@ namespace VNexus {
             routeRule3["outbound"] = "direct";
 
             json routeRule4;
-            routeRule4["action"] = "sniff";
-            routeRule4["inbound"] = {"tun-in"};
-            routeRule4["protocol"] = {"http", "tls", "quic"};
+            routeRule4["action"] = "route";
+            routeRule4["ip_cidr"] = {"161.118.248.52/32"};
+            routeRule4["outbound"] = "direct";
 
-            j["rules"] = json::array({routeRule1, routeRule2, routeRule3, routeRule4});
+            json routeRule5;
+            routeRule5["action"] = "sniff";
+            routeRule5["inbound"] = {"tun-in"};
+            routeRule5["protocol"] = {"http", "tls", "quic"};
+
+            j["route"]["rules"] = json::array({routeRule1, routeRule2, routeRule3, routeRule4, routeRule5});
 
             return j.dump(2);
         }
