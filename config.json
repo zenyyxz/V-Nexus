@@ -1,7 +1,7 @@
 {
   "log": {
-    "level": "trace",
-    "output": "vnexus.log",
+    "level": "info",
+    "output": "",
     "timestamp": true
   },
   "inbounds": [

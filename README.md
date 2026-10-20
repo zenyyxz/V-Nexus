@@ -1,4 +1,6 @@
-# vnexus-engine
+# NexusFlow
+
+NexusFlow is the networking engine behind the V-Nexus client.
 
 High-performance C++20 VPN and proxy routing engine featuring deep SNI sniffing, native Linux TUN mode, and VLESS/VMess tunneling protocols.
 
@@ -6,7 +8,7 @@ High-performance C++20 VPN and proxy routing engine featuring deep SNI sniffing,
 
 ## Overview
 
-vnexus-engine is a modular, high-throughput network engine built from scratch in modern C++20 using standalone Asio and OpenSSL. It captures system traffic through a virtual Linux TUN device or local proxy listeners, sniffs target hostnames from outgoing TLS/HTTP packets in real time, applies flexible routing rules, and routes traffic through encrypted tunnels.
+NexusFlow is a modular, high-throughput network engine built from scratch in modern C++20 using standalone Asio and OpenSSL. It captures system traffic through a virtual Linux TUN device or local proxy listeners, sniffs target hostnames from outgoing TLS/HTTP packets in real time, applies flexible routing rules, and routes traffic through encrypted tunnels.
 
 ---
 
@@ -47,7 +49,7 @@ vnexus-engine is a modular, high-throughput network engine built from scratch in
 ## Codebase Directory Structure
 
 ```
-vnexus-engine/
+NexusFlow/
 ├── CMakeLists.txt              # CMake build configuration
 ├── README.md                   # Project documentation
 ├── config.json                 # Active runtime configuration
@@ -262,7 +264,7 @@ Configurations are written in JSON. Below is an example configuring both VLESS a
 TUN mode creates a virtual kernel interface and alters the routing table, requiring administrative privileges:
 
 ```bash
-sudo ./build/vnexus --config config.json
+sudo ./build/NexusFlow --config config.json
 ```
 
 ### Running without Sudo (Linux Capabilities)
@@ -270,8 +272,8 @@ sudo ./build/vnexus --config config.json
 You can grant binary capabilities to run the TUN interface without invoking `sudo`:
 
 ```bash
-sudo setcap cap_net_admin,cap_net_raw+eip ./build/vnexus
-./build/vnexus --config config.json
+sudo setcap cap_net_admin,cap_net_raw+eip ./build/NexusFlow
+./build/NexusFlow --config config.json
 ```
 
 ### Graceful Termination

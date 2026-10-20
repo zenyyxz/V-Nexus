@@ -1,12 +1,12 @@
 # Configuration Guide
 
-This guide describes how to write and customize `config.json` for vnexus-engine.
+This guide describes how to write and customize `config.json` for NexusFlow.
 
 ---
 
 ## Configuration Overview
 
-vnexus-engine reads its runtime parameters from a single JSON file. The configuration is divided into four main sections:
+NexusFlow reads its runtime parameters from a single JSON file. The configuration is divided into four main sections:
 
 1. **`log`**: Controls log severity level, log file output, and timestamps.
 2. **`inbounds`**: Defines how traffic enters the engine (TUN interface or proxy ports) and configures SNI/Host sniffing.
@@ -48,7 +48,7 @@ Configures the logging subsystem powered by spdlog.
 
 ## 2. The `inbounds` Section
 
-An array of inbound listeners. vnexus-engine supports four inbound types: `tun`, `mixed`, `socks5`, and `http`.
+An array of inbound listeners. NexusFlow supports four inbound types: `tun`, `mixed`, `socks5`, and `http`.
 
 ### TUN Inbound (`type: "tun"`)
 
@@ -450,7 +450,7 @@ Used to provide a local proxy port (`127.0.0.1:10808`) for web browsers and indi
 ## Best Practices and Recommendations
 
 1. **Avoid Subnet Overlaps**:
-   If another VPN software is installed or previously created a TUN adapter with `172.19.0.1`, configure vnexus-engine to use `172.20.0.1/30` or `10.10.0.1/30` in `tun.address` to prevent kernel routing conflicts.
+   If another VPN software is installed or previously created a TUN adapter with `172.19.0.1`, configure NexusFlow to use `172.20.0.1/30` or `10.10.0.1/30` in `tun.address` to prevent kernel routing conflicts.
 
 2. **Always Exclude Server IP**:
    Under TUN mode with `auto_route: true`, ensure the remote server's IP address (e.g. `161.118.248.52/32`) is added to both `tun.route_exclude_address` and your routing `direct` rules. If omitted, packets bound for the VPN server will be routed into the TUN interface, creating a routing loop.
@@ -458,6 +458,6 @@ Used to provide a local proxy port (`127.0.0.1:10808`) for web browsers and indi
 3. **Running Without Root**:
    Grant network administration capabilities to the executable to run TUN mode without invoking `sudo`:
    ```bash
-   sudo setcap cap_net_admin,cap_net_raw+eip ./build/vnexus
-   ./build/vnexus --config config.json
+   sudo setcap cap_net_admin,cap_net_raw+eip ./build/NexusFlow
+   ./build/NexusFlow --config config.json
    ```

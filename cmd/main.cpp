@@ -6,15 +6,8 @@
 
 void print_banner() {
     std::cout << R"(
- __     __ _   _                        ______             _             
- \ \   / /| \ | |                      |  ____|           (_)            
-  \ \_/ / |  \| |  ___ __  __ _   _  ___| |__   _ __   __ _ _ _ __   ___ 
-   \   /  | . ` | / _ \\ \/ /| | | |/ __|  __| | '_ \ / _` | | '_ \ / _ \
-    | |   | |\  ||  __/ >  < | |_| |\__ \ |____| | | | (_| | | | | |  __/
-    |_|   |_| \_| \___|/_/\_\ \__,_||___/______|_| |_|\__, |_|_| |_|\___|
-                                                        __/ |            
-                                                       |___/             
-    vnexus-engine - High Performance C++ VPN Core with SNI Sniffing
+    NexusFlow
+    High-performance C++ networking engine for V-Nexus
     Version: 1.0.0
 )" << std::endl;
 }
@@ -80,7 +73,7 @@ int main(int argc, char* argv[]) {
             engine.stop();
         });
 
-        VN_INFO("[main] Starting vnexus-engine...");
+        VN_INFO("[main] Starting NexusFlow...");
         engine.run();
 
     } catch (const std::exception& ex) {

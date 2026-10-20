@@ -55,13 +55,22 @@ echo "Copying binary..."
 cp "${BINARY_SRC}" "${INSTALL_DIR}/NexusFlow"
 chmod 755 "${INSTALL_DIR}/NexusFlow"
 
-# Only copy config if it does not already exist (avoid overwriting a production config on upgrade)
-if [[ ! -f "${INSTALL_DIR}/config.json" ]]; then
-    echo "Copying config.json (first install)..."
+# Copy or update config
+if [[ ! -f "${INSTALL_DIR}/config.json" ]] || [[ "${1:-}" == "--update-config" ]]; then
+    echo "Writing config.json to ${INSTALL_DIR}/config.json..."
     cp "${CONFIG_SRC}" "${INSTALL_DIR}/config.json"
     chmod 640 "${INSTALL_DIR}/config.json"
 else
-    echo "Existing config.json found - skipping copy (edit ${INSTALL_DIR}/config.json manually)."
+    echo "Existing config.json found."
+    # Ensure disk logging is disabled and trace level is not flooding disk
+    sed -i 's/"output"[[:space:]]*:[[:space:]]*"[^"]*"/"output": ""/g' "${INSTALL_DIR}/config.json"
+    sed -i 's/"level"[[:space:]]*:[[:space:]]*"trace"/"level": "info"/g' "${INSTALL_DIR}/config.json"
+fi
+
+# Remove large disk log file if present
+if [[ -f "${INSTALL_DIR}/vnexus.log" ]]; then
+    echo "Removing large legacy disk log: ${INSTALL_DIR}/vnexus.log"
+    rm -f "${INSTALL_DIR}/vnexus.log"
 fi
 
 echo "Installing systemd service..."

@@ -1,12 +1,12 @@
 # Codebase Architecture and File Reference
 
-This document provides a comprehensive overview of the vnexus-engine architecture, detailing the purpose and implementation of each file across the project.
+This document provides a comprehensive overview of the NexusFlow architecture, detailing the purpose and implementation of each file across the project.
 
 ---
 
 ## Architecture Overview
 
-vnexus-engine is an asynchronous, high-performance VPN and proxy routing engine written in C++20 using standalone Asio and OpenSSL. It captures local network traffic either via an operating system TUN device (`/dev/net/tun`) or via a local SOCKS5/HTTP proxy port, inspects outgoing TCP connections to extract TLS Server Name Indication (SNI) or HTTP Host headers, applies rule-based routing, and encapsulates packets into outbound tunnels such as VLESS v0 or VMess over TCP or TLS.
+NexusFlow is an asynchronous, high-performance VPN and proxy routing engine written in C++20 using standalone Asio and OpenSSL. It captures local network traffic either via an operating system TUN device (`/dev/net/tun`) or via a local SOCKS5/HTTP proxy port, inspects outgoing TCP connections to extract TLS Server Name Indication (SNI) or HTTP Host headers, applies rule-based routing, and encapsulates packets into outbound tunnels such as VLESS v0 or VMess over TCP or TLS.
 
 ### Traffic Flow Diagram
 
