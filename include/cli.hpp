@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string>
+#include <initializer_list>
 
 namespace VNexus {
     namespace CLI {
@@ -11,6 +12,7 @@ namespace VNexus {
 
             bool hasCommand(const std::string &cmd) const;
             std::string getOption(const std::string &flag) const;
+            std::string getOption(std::initializer_list<std::string> flags) const;
             void printHelp() const;
 
             private:

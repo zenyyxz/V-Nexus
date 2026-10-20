@@ -25,6 +25,17 @@ std::string VNexus::CLI::CLIParser::getOption(const std::string &flag) const {
     return "";
 }
 
+std::string VNexus::CLI::CLIParser::getOption(std::initializer_list<std::string> flags) const {
+    for (size_t i{0}; i < args_.size(); ++i) {
+        for (const auto &flag : flags) {
+            if (args_[i] == flag && i + 1 < args_.size()) {
+                return args_[i + 1];
+            }
+        }
+    }
+    return "";
+}
+
 void VNexus::CLI::CLIParser::printHelp() const {
     std::cout << "Usage: vnexus [options...] [args]\n\n";
     std::cout << "Options:\n";
