@@ -1,6 +1,6 @@
 {
   "log": {
-    "level": "debug",
+    "level": "trace",
     "output": "vnexus.log",
     "timestamp": true
   },

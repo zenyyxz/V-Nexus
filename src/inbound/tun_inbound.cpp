@@ -103,20 +103,20 @@ public:
         ioc_(ioc),
         session_id_(session_id),
         key_(key),
-        client_seq_(initial_client_seq),
-        my_seq_(100000 + (initial_client_seq & 0xFFFF)),
+        client_seq_(initial_client_seq + 1), // +1: SYN consumes a seq number
+        my_isn_(0x12345678 ^ (initial_client_seq & 0xFFFFFF)),
+        my_seq_(my_isn_ + 1),
         target_domain_(std::move(target_domain)),
         cfg_(cfg),
         sniffer_(sniffer),
-        dispatcher_(std::move(dispatcher)),
-        sock_tun_(ioc) {}
+        dispatcher_(std::move(dispatcher)) {}
 
     void handle_packet(const uint8_t* tcp_hdr, size_t /*tcp_len*/, const uint8_t* payload, size_t payload_len) {
         uint8_t flags = tcp_hdr[13];
-        uint32_t seq = (static_cast<uint32_t>(tcp_hdr[4]) << 24) |
-                       (static_cast<uint32_t>(tcp_hdr[5]) << 16) |
-                       (static_cast<uint32_t>(tcp_hdr[6]) << 8) |
-                       tcp_hdr[7];
+        uint32_t seq  = (static_cast<uint32_t>(tcp_hdr[4]) << 24) |
+                        (static_cast<uint32_t>(tcp_hdr[5]) << 16) |
+                        (static_cast<uint32_t>(tcp_hdr[6]) << 8)  |
+                        tcp_hdr[7];
 
         if (flags & 0x04) { // RST
             close();
@@ -124,87 +124,52 @@ public:
         }
 
         if (flags & 0x01) { // FIN
-            client_seq_ = seq + 1;
+            client_seq_ = seq + 1; // FIN consumes a seq number
             send_tcp_packet(0x11); // FIN | ACK
             my_seq_++;
             close();
             return;
         }
 
+        if ((flags & 0x02) && state_ == State::SYN_RECEIVED) {
+            // Client retransmitted SYN, re-send SYN-ACK
+            send_syn_ack();
+            return;
+        }
+
         if (state_ == State::SYN_RECEIVED) {
-            if (flags & 0x10) { // ACK
+            if (flags & 0x10) { // ACK — three-way handshake complete
                 state_ = State::ESTABLISHED;
+                VN_DEBUG("[tun-session #{}] ESTABLISHED {}:{} -> {}:{}",
+                         session_id_, 
+                         asio::ip::address_v4(key_.src_ip).to_string(), key_.src_port,
+                         asio::ip::address_v4(key_.dst_ip).to_string(), key_.dst_port);
             }
         }
 
-        if (payload_len > 0) {
-            client_seq_ = seq + payload_len;
-            send_tcp_packet(0x10); // Send ACK for received data
+        if (payload_len > 0 && state_ == State::ESTABLISHED) {
+            client_seq_ = seq + static_cast<uint32_t>(payload_len);
+            send_tcp_packet(0x10); // ACK
 
+            // Accumulate data until we can dispatch
             if (!dispatched_) {
-                // Collect payload for sniffing
                 initial_payload_.insert(initial_payload_.end(), payload, payload + payload_len);
 
-                // Attempt SNI sniffing
+                // Try SNI sniff
                 auto res = sniffer_.sniff(initial_payload_);
-                std::string sniffed_sni;
-                std::string sniffed_proto;
                 if (res.success) {
-                    sniffed_sni = res.domain;
-                    sniffed_proto = res.protocol;
-                    VN_INFO("[tun-session #{}] [sniff] detected domain '{}' (protocol: '{}')",
+                    VN_INFO("[tun-session #{}] SNI sniffed: '{}' ({})",
                             session_id_, res.domain, res.protocol);
                 }
 
-                // Setup local socket pair to connect to engine dispatcher
-                asio::local::stream_protocol::socket sock_client(ioc_);
-                std::error_code pair_ec;
-                asio::local::connect_pair(sock_tun_, sock_client, pair_ec);
-                if (pair_ec) {
-                    VN_ERROR("[tun-session #{}] connect_pair failed: {}", session_id_, pair_ec.message());
-                    close();
-                    return;
-                }
-
-                auto session = std::make_shared<SessionContext>();
-                session->id = session_id_;
-                session->inbound_tag = cfg_.tag;
-
-                asio::ip::address_v4 src_addr(key_.src_ip);
-                asio::ip::address_v4 dst_addr(key_.dst_ip);
-                session->client_endpoint = asio::ip::tcp::endpoint(src_addr, key_.src_port);
-
-                EndpointAddress dest;
-                dest.port = key_.dst_port;
-                if (!sniffed_sni.empty() && cfg_.sniff_override_destination) {
-                    dest.host = sniffed_sni;
-                    dest.type = AddressType::Domain;
-                    session->destination_overridden = true;
-                    session->sniffed_domain = sniffed_sni;
-                    session->sniffed_protocol = sniffed_proto;
-                    session->sniff_successful = true;
-                } else if (!target_domain_.empty()) {
-                    dest.host = target_domain_;
-                    dest.type = AddressType::Domain;
-                } else {
-                    dest.host = dst_addr.to_string();
-                    dest.type = AddressType::IPv4;
-                }
-                session->original_destination = dest;
-                session->target_destination = dest;
-
-                dispatched_ = true;
-
-                // Dispatch to outbound (e.g. VLESS Outbound)
-                // Convert local socket to tcp socket representation via dispatcher
-                // or pump between sock_tun_ and upstream
-                start_stream_relay(session, std::move(sock_client));
-            } else {
-                // Subsequent data after connection established: write to sock_tun_
+                // Dispatch immediately — we have at least the first data chunk
+                do_dispatch(res);
+            } else if (pipe_write_sock_) {
+                // Already dispatched: funnel subsequent data to the pipe
                 auto self = shared_from_this();
-                auto buf = std::make_shared<std::vector<uint8_t>>(payload, payload + payload_len);
-                asio::async_write(sock_tun_, asio::buffer(*buf),
-                    [this, self, buf](std::error_code ec, size_t /*wlen*/) {
+                auto buf  = std::make_shared<std::vector<uint8_t>>(payload, payload + payload_len);
+                asio::async_write(*pipe_write_sock_, asio::buffer(*buf),
+                    [this, self, buf](std::error_code ec, size_t) {
                         if (ec) close();
                     });
             }
@@ -212,27 +177,126 @@ public:
     }
 
     void send_syn_ack() {
+        uint32_t saved = my_seq_;
+        my_seq_ = my_isn_;
         send_tcp_packet(0x12); // SYN | ACK
-        my_seq_++;
+        my_seq_ = saved;
     }
 
 private:
+    // -----------------------------------------------------------------------
+    // Dispatch: open a real AF_UNIX socketpair, hand one end to the outbound
+    // dispatcher as a tcp::socket (fd-level assignment), use the other end as
+    // our pipe to write application data into the outbound and read replies.
+    // -----------------------------------------------------------------------
+    void do_dispatch(const SniffResult& sniff_res) {
+        dispatched_ = true;
+
+        // Create a real unix stream socketpair
+        int sv[2];
+        if (::socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sv) < 0) {
+            VN_ERROR("[tun-session #{}] socketpair failed: {}", session_id_, strerror(errno));
+            close();
+            return;
+        }
+
+        // sv[0] → we keep as write pipe to outbound / read pipe from outbound
+        // sv[1] → handed to the dispatcher as a fake tcp::socket
+        pipe_write_sock_ = std::make_unique<asio::ip::tcp::socket>(ioc_);
+        std::error_code ec;
+        pipe_write_sock_->assign(asio::ip::tcp::v4(), sv[0], ec);
+        if (ec) {
+            ::close(sv[0]); ::close(sv[1]);
+            VN_ERROR("[tun-session #{}] assign sv[0] failed: {}", session_id_, ec.message());
+            close();
+            return;
+        }
+
+        asio::ip::tcp::socket dispatcher_sock(ioc_);
+        dispatcher_sock.assign(asio::ip::tcp::v4(), sv[1], ec);
+        if (ec) {
+            ::close(sv[1]);
+            VN_ERROR("[tun-session #{}] assign sv[1] failed: {}", session_id_, ec.message());
+            close();
+            return;
+        }
+
+        // Build session context
+        auto session = std::make_shared<SessionContext>();
+        session->id          = session_id_;
+        session->inbound_tag = cfg_.tag;
+        session->client_endpoint = asio::ip::tcp::endpoint(
+            asio::ip::address_v4(key_.src_ip), key_.src_port);
+
+        EndpointAddress dest;
+        dest.port = key_.dst_port;
+        if (sniff_res.success && !sniff_res.domain.empty() && cfg_.sniff_override_destination) {
+            dest.host                      = sniff_res.domain;
+            dest.type                      = AddressType::Domain;
+            session->destination_overridden = true;
+            session->sniffed_domain        = sniff_res.domain;
+            session->sniffed_protocol      = sniff_res.protocol;
+            session->sniff_successful      = true;
+        } else if (!target_domain_.empty()) {
+            dest.host = target_domain_;
+            dest.type = AddressType::Domain;
+        } else {
+            dest.host = asio::ip::address_v4(key_.dst_ip).to_string();
+            dest.type = AddressType::IPv4;
+        }
+        session->original_destination = dest;
+        session->target_destination   = dest;
+
+        VN_INFO("[tun-session #{}] Dispatching to '{}:{}'",
+                session_id_, dest.host, dest.port);
+
+        // Start reading replies from the outbound and sending them as TCP packets
+        do_read_from_pipe();
+
+        // Hand the other end to the dispatcher (VLESS outbound) along with the initial payload
+        dispatcher_(session, std::move(dispatcher_sock), std::move(initial_payload_));
+    }
+
+    // Read data flowing back from the outbound and inject into TUN as TCP packets
+    void do_read_from_pipe() {
+        if (!pipe_write_sock_) return;
+        auto self = shared_from_this();
+        pipe_write_sock_->async_read_some(asio::buffer(read_buf_),
+            [this, self](std::error_code ec, size_t len) {
+                if (!ec && len > 0) {
+                    // Chunk into MSS-sized TCP data packets
+                    size_t off = 0;
+                    while (off < len) {
+                        size_t chunk = std::min(static_cast<size_t>(1360), len - off);
+                        send_tcp_packet(0x18, &read_buf_[off], chunk); // PSH | ACK
+                        my_seq_ += static_cast<uint32_t>(chunk);
+                        off += chunk;
+                    }
+                    do_read_from_pipe();
+                } else {
+                    if (ec && ec != asio::error::eof && ec != asio::error::operation_aborted) {
+                        VN_DEBUG("[tun-session #{}] pipe read error: {}", session_id_, ec.message());
+                    }
+                    send_tcp_packet(0x11); // FIN | ACK
+                    my_seq_++;
+                    close();
+                }
+            });
+    }
+
     void send_tcp_packet(uint8_t flags, const uint8_t* payload = nullptr, size_t payload_len = 0) {
-        // Build IPv4 + TCP packet
         size_t total_len = 20 + 20 + payload_len;
         std::vector<uint8_t> pkt(total_len, 0);
 
-        // IPv4 Header
-        pkt[0] = 0x45; // Version 4, IHL 5
-        pkt[1] = 0x00; // TOS
-        pkt[2] = static_cast<uint8_t>(total_len >> 8);
-        pkt[3] = static_cast<uint8_t>(total_len & 0xFF);
-        pkt[4] = 0x00; pkt[5] = 0x00; // ID
-        pkt[6] = 0x40; pkt[7] = 0x00; // DF
-        pkt[8] = 64;   // TTL
-        pkt[9] = 6;    // TCP
+        // IPv4 header
+        pkt[0]  = 0x45;
+        pkt[2]  = static_cast<uint8_t>(total_len >> 8);
+        pkt[3]  = static_cast<uint8_t>(total_len & 0xFF);
+        pkt[6]  = 0x40; // DF
+        pkt[8]  = 64;   // TTL
+        pkt[9]  = 6;    // TCP
 
-        // Source IP = dst_ip (reflecting back), Destination IP = src_ip
+        // Source = server (dst_ip:dst_port), Destination = client (src_ip:src_port)
         pkt[12] = static_cast<uint8_t>(key_.dst_ip >> 24);
         pkt[13] = static_cast<uint8_t>((key_.dst_ip >> 16) & 0xFF);
         pkt[14] = static_cast<uint8_t>((key_.dst_ip >> 8) & 0xFF);
@@ -247,7 +311,7 @@ private:
         pkt[10] = static_cast<uint8_t>(ip_csum >> 8);
         pkt[11] = static_cast<uint8_t>(ip_csum & 0xFF);
 
-        // TCP Header (offset 20)
+        // TCP header
         pkt[20] = static_cast<uint8_t>(key_.dst_port >> 8);
         pkt[21] = static_cast<uint8_t>(key_.dst_port & 0xFF);
         pkt[22] = static_cast<uint8_t>(key_.src_port >> 8);
@@ -263,12 +327,10 @@ private:
         pkt[30] = static_cast<uint8_t>((client_seq_ >> 8) & 0xFF);
         pkt[31] = static_cast<uint8_t>(client_seq_ & 0xFF);
 
-        pkt[32] = 0x50; // Data offset: 5 (20 bytes)
+        pkt[32] = 0x50; // data offset 5 (20 bytes)
         pkt[33] = flags;
-
-        // Window size: 65535
-        pkt[34] = 0xFF;
-        pkt[35] = 0xFF;
+        pkt[34] = 0xFF; // window high
+        pkt[35] = 0xFF; // window low
 
         if (payload && payload_len > 0) {
             std::memcpy(&pkt[40], payload, payload_len);
@@ -281,99 +343,39 @@ private:
         tun_.write_packet(std::move(pkt));
     }
 
-    void start_stream_relay(
-        std::shared_ptr<SessionContext> session,
-        asio::local::stream_protocol::socket sock_client
-    ) {
-        // Read from sock_tun_ (data coming from outbound/VLESS) and send as TCP packets to TUN
-        do_read_from_tun_socket();
-
-        // Feed initial payload to dispatcher via local socket
-        auto self = shared_from_this();
-        if (!initial_payload_.empty()) {
-            auto init_buf = std::make_shared<std::vector<uint8_t>>(std::move(initial_payload_));
-            asio::async_write(sock_tun_, asio::buffer(*init_buf),
-                [this, self, session, sock = std::make_shared<asio::local::stream_protocol::socket>(std::move(sock_client))](
-                    std::error_code ec, size_t /*wlen*/) mutable {
-                    if (!ec) {
-                        dispatch_local_to_engine(session, std::move(*sock));
-                    } else {
-                        close();
-                    }
-                });
-        } else {
-            dispatch_local_to_engine(session, std::move(sock_client));
-        }
-    }
-
-    void dispatch_local_to_engine(
-        std::shared_ptr<SessionContext> session,
-        asio::local::stream_protocol::socket sock_client
-    ) {
-        // We convert the connected local stream socket fd into an asio::ip::tcp::socket
-        // using native_handle so the standard outbound relay can drive it!
-        int native_fd = dup(sock_client.native_handle());
-        std::error_code close_ec;
-        sock_client.close(close_ec);
-
-        asio::ip::tcp::socket tcp_sock(ioc_);
-        tcp_sock.assign(asio::ip::tcp::v4(), native_fd);
-
-        dispatcher_(session, std::move(tcp_sock), {});
-    }
-
-    void do_read_from_tun_socket() {
-        auto self = shared_from_this();
-        sock_tun_.async_read_some(asio::buffer(tun_sock_buf_),
-            [this, self](std::error_code ec, size_t length) {
-                if (!ec && length > 0) {
-                    // Split into MSS-sized packets (1360 bytes)
-                    size_t offset = 0;
-                    while (offset < length) {
-                        size_t chunk = std::min(static_cast<size_t>(1360), length - offset);
-                        send_tcp_packet(0x18, &tun_sock_buf_[offset], chunk); // PSH | ACK
-                        my_seq_ += chunk;
-                        offset += chunk;
-                    }
-                    do_read_from_tun_socket();
-                } else {
-                    send_tcp_packet(0x11); // FIN | ACK
-                    my_seq_++;
-                    close();
-                }
-            });
-    }
-
     void close() {
         if (state_ == State::CLOSED) return;
         state_ = State::CLOSED;
-
-        std::error_code ec;
-        sock_tun_.close(ec);
+        if (pipe_write_sock_) {
+            std::error_code ec;
+            pipe_write_sock_->close(ec);
+        }
         tun_.remove_connection(key_);
     }
 
-    TunInbound& tun_;
-    asio::io_context& ioc_;
-    uint64_t session_id_;
-    TunTcpKey key_;
-    uint32_t client_seq_{0};
-    uint32_t my_seq_{100000};
-    std::string target_domain_;
-    config::InboundConfig cfg_;
+    TunInbound&              tun_;
+    asio::io_context&        ioc_;
+    uint64_t                 session_id_;
+    TunTcpKey                key_;
+    uint32_t                 client_seq_{0};
+    uint32_t                 my_isn_{100000};
+    uint32_t                 my_seq_{100000};
+    std::string              target_domain_;
+    config::InboundConfig    cfg_;
     const sniff::CompositeSniffer& sniffer_;
-    DispatchHandler dispatcher_;
+    DispatchHandler          dispatcher_;
 
-    State state_{State::SYN_RECEIVED};
-    bool dispatched_{false};
-    std::vector<uint8_t> initial_payload_;
-    asio::local::stream_protocol::socket sock_tun_;
-    std::array<uint8_t, 16384> tun_sock_buf_{};
+    State                    state_{State::SYN_RECEIVED};
+    bool                     dispatched_{false};
+    std::vector<uint8_t>     initial_payload_;
+    std::unique_ptr<asio::ip::tcp::socket> pipe_write_sock_;
+    std::array<uint8_t, 16384> read_buf_{};
 };
 
 // =========================================================================
 // TunInbound Implementation
 // =========================================================================
+
 
 TunInbound::TunInbound(
     asio::io_context& ioc,
@@ -590,10 +592,18 @@ void TunInbound::handle_packet(std::vector<uint8_t> packet) {
 
     uint8_t protocol = packet[9];
 
+    VN_TRACE("[inbound-tun] Received packet: proto={} len={}", protocol, packet.size());
+
     if (protocol == 1) { // ICMP
         handle_icmp(packet, ip_hdr_len);
-    } else if (protocol == 17) { // UDP (DNS)
-        handle_dns(packet, ip_hdr_len);
+    } else if (protocol == 17) { // UDP
+        // Check dst port 53 for DNS, otherwise ignore
+        if (packet.size() > ip_hdr_len + 3) {
+            uint16_t dst_port = (static_cast<uint16_t>(packet[ip_hdr_len + 2]) << 8) | packet[ip_hdr_len + 3];
+            if (dst_port == 53) {
+                handle_dns(packet, ip_hdr_len);
+            }
+        }
     } else if (protocol == 6) { // TCP
         handle_tcp(packet, ip_hdr_len);
     }
@@ -735,29 +745,39 @@ void TunInbound::handle_tcp(std::vector<uint8_t>& packet, size_t ip_hdr_len) {
     const uint8_t* tcp = &packet[ip_hdr_len];
     uint16_t src_port = (static_cast<uint16_t>(tcp[0]) << 8) | tcp[1];
     uint16_t dst_port = (static_cast<uint16_t>(tcp[2]) << 8) | tcp[3];
+    uint8_t flags = tcp[13];
 
-    uint32_t src_ip = (static_cast<uint32_t>(packet[12]) << 24) |
-                      (static_cast<uint32_t>(packet[13]) << 16) |
-                      (static_cast<uint32_t>(packet[14]) << 8) |
-                      packet[15];
-    uint32_t dst_ip = (static_cast<uint32_t>(packet[16]) << 24) |
-                      (static_cast<uint32_t>(packet[17]) << 16) |
-                      (static_cast<uint32_t>(packet[18]) << 8) |
-                      packet[19];
+    // Extract IPs as network-ordered 32-bit value for consistency with inet_ntoa
+    uint32_t src_ip_n = (static_cast<uint32_t>(packet[12]) << 24) |
+                        (static_cast<uint32_t>(packet[13]) << 16) |
+                        (static_cast<uint32_t>(packet[14]) << 8) |
+                        packet[15];
+    uint32_t dst_ip_n = (static_cast<uint32_t>(packet[16]) << 24) |
+                        (static_cast<uint32_t>(packet[17]) << 16) |
+                        (static_cast<uint32_t>(packet[18]) << 8) |
+                        packet[19];
+
+    // Build human-readable IPs for lookup (host order for asio::ip::address_v4)
+    asio::ip::address_v4 src_addr(src_ip_n);
+    asio::ip::address_v4 dst_addr(dst_ip_n);
+
+    VN_DEBUG("[inbound-tun] TCP flags=0x{:02x} {}:{} -> {}:{}", 
+             flags,
+             src_addr.to_string(), src_port,
+             dst_addr.to_string(), dst_port);
 
     TunTcpKey key{
-        .src_ip = src_ip,
+        .src_ip = src_ip_n,
         .src_port = src_port,
-        .dst_ip = dst_ip,
+        .dst_ip = dst_ip_n,
         .dst_port = dst_port
     };
 
     size_t tcp_hdr_len = ((tcp[12] >> 4) & 0x0F) * 4;
-    if (packet.size() < ip_hdr_len + tcp_hdr_len) return;
+    if (tcp_hdr_len < 20 || packet.size() < ip_hdr_len + tcp_hdr_len) return;
 
     const uint8_t* payload = tcp + tcp_hdr_len;
     size_t payload_len = packet.size() - ip_hdr_len - tcp_hdr_len;
-    uint8_t flags = tcp[13];
 
     std::shared_ptr<TunTcpConnection> session;
     {
@@ -776,8 +796,12 @@ void TunInbound::handle_tcp(std::vector<uint8_t>& packet, size_t ip_hdr_len) {
                                           (static_cast<uint32_t>(tcp[6]) << 8) |
                                           tcp[7];
 
-            asio::ip::address_v4 dst_addr(dst_ip);
             std::string domain = get_domain_for_fakeip(dst_addr.to_string());
+
+            VN_INFO("[inbound-tun] New TCP session: {}:{} -> {}:{} domain='{}'",
+                    src_addr.to_string(), src_port,
+                    dst_addr.to_string(), dst_port,
+                    domain.empty() ? dst_addr.to_string() : domain);
 
             uint64_t id = session_counter_.fetch_add(1);
             session = std::make_shared<TunTcpConnection>(
@@ -790,6 +814,8 @@ void TunInbound::handle_tcp(std::vector<uint8_t>& packet, size_t ip_hdr_len) {
             }
 
             session->send_syn_ack();
+        } else {
+            VN_DEBUG("[inbound-tun] TCP non-SYN packet for unknown session, dropping");
         }
     } else {
         session->handle_packet(tcp, tcp_hdr_len, payload, payload_len);
