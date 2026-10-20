@@ -50,11 +50,7 @@
       "tls": {
         "enabled": true,
         "server_name": "aka.ms",
-        "insecure": true,
-        "alpn": [
-          "h2",
-          "http/1.1"
-        ]
+        "insecure": true
       }
     },
     {

@@ -48,15 +48,41 @@ private:
         remote_->async_read_some(asio::buffer(remote_buf_),
             [this, self](std::error_code ec, size_t length) {
                 if (!ec && length > 0) {
-                    session_->bytes_down += length;
-                    asio::async_write(client_, asio::buffer(remote_buf_.data(), length),
-                        [this, self](std::error_code write_ec, size_t /*wlen*/) {
-                            if (!write_ec) {
-                                do_read_remote();
+                    size_t offset = 0;
+                    if (!vless_resp_header_parsed_) {
+                        // VLESS server response: [Version(1B)][Addons length(1B)][Addons...][Target response payload]
+                        if (length >= 2) {
+                            uint8_t addons_len = remote_buf_[1];
+                            size_t hdr_len = 2 + addons_len;
+                            if (length >= hdr_len) {
+                                offset = hdr_len;
+                                vless_resp_header_parsed_ = true;
+                                VN_DEBUG("[vless-relay #{}] stripped VLESS response header (addons_len={}), forwarding {} bytes",
+                                         session_->id, addons_len, length - hdr_len);
                             } else {
-                                close();
+                                vless_resp_header_parsed_ = true;
+                                offset = length;
                             }
-                        });
+                        } else {
+                            vless_resp_header_parsed_ = true;
+                            offset = length;
+                        }
+                    }
+
+                    size_t payload_len = length - offset;
+                    if (payload_len > 0) {
+                        session_->bytes_down += payload_len;
+                        asio::async_write(client_, asio::buffer(remote_buf_.data() + offset, payload_len),
+                            [this, self](std::error_code write_ec, size_t /*wlen*/) {
+                                if (!write_ec) {
+                                    do_read_remote();
+                                } else {
+                                    close();
+                                }
+                            });
+                    } else {
+                        do_read_remote();
+                    }
                 } else {
                     close();
                 }
@@ -86,6 +112,7 @@ private:
     std::array<uint8_t, 32768> client_buf_{};
     std::array<uint8_t, 32768> remote_buf_{};
     bool closed_{false};
+    bool vless_resp_header_parsed_{false};
 };
 
 } // namespace
@@ -295,37 +322,12 @@ void VlessOutbound::dispatch_tls(
                                     return;
                                 }
 
-                                VN_INFO("[vless-tls #{}] sent VLESS request ({} bytes), waiting for server response...", session->id, wlen);
+                                VN_INFO("[vless-tls #{}] sent VLESS request ({} bytes), starting bidirectional relay", session->id, wlen);
 
-                                auto resp_hdr = std::make_shared<std::array<uint8_t, 2>>();
-                                asio::async_read(*remote_ssl, asio::buffer(*resp_hdr),
-                                    [session, client_sock, remote_ssl, resp_hdr](std::error_code read_ec, size_t /*rlen*/) mutable {
-                                        if (read_ec) {
-                                            VN_WARN("[vless-tls #{}] failed reading server response: {}", session->id, read_ec.message());
-                                            return;
-                                        }
-
-                                        uint8_t addons_len = (*resp_hdr)[1];
-                                        VN_INFO("[vless-tls #{}] server responded (addons_len={}), starting relay", session->id, addons_len);
-
-                                        if (addons_len > 0) {
-                                            auto addons_buf = std::make_shared<std::vector<uint8_t>>(addons_len);
-                                            asio::async_read(*remote_ssl, asio::buffer(*addons_buf),
-                                                [session, client_sock, remote_ssl, addons_buf](std::error_code aec, size_t /*alen*/) mutable {
-                                                    if (!aec) {
-                                                        auto relay = std::make_shared<SslSocketRelay>(
-                                                            session, std::move(*client_sock), remote_ssl
-                                                        );
-                                                        relay->start();
-                                                    }
-                                                });
-                                        } else {
-                                            auto relay = std::make_shared<SslSocketRelay>(
-                                                session, std::move(*client_sock), remote_ssl
-                                            );
-                                            relay->start();
-                                        }
-                                    });
+                                auto relay = std::make_shared<SslSocketRelay>(
+                                    session, std::move(*client_sock), remote_ssl
+                                );
+                                relay->start();
                             });
                     });
             });
