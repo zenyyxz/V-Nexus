@@ -143,7 +143,7 @@ namespace VNexus {
 
             j["route"]["rules"] = json::array({routeRule1, routeRule2, routeRule3, routeRule4, routeRule5});
 
-            return j.dump(2);
+            return j.dump(4);
         }
 
         bool SaveConfigFile(const ConfigAttributes &config, const std::string &filepath) {

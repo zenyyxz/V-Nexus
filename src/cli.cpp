@@ -16,6 +16,15 @@ bool VNexus::CLI::CLIParser::hasCommand(const std::string& cmd) const {
     return false;
 }
 
+std::string VNexus::CLI::CLIParser::getOption(const std::string &flag) const {
+    for (size_t i{0}; i < args_.size(); ++i) {
+        if (args_[i] == flag && i + 1 < args_.size()) { // second comparison is essential here to prevent seg faults.
+            return args_[i + 1];
+        }
+    }
+    return "";
+}
+
 void VNexus::CLI::CLIParser::printHelp() const {
     std::cout << "Usage: vnexus [options...] [args]\n\n";
     std::cout << "Options:\n";

@@ -10,6 +10,7 @@ namespace VNexus {
             CLIParser(int argc, char* argv[]);
 
             bool hasCommand(const std::string &cmd) const;
+            std::string getOption(const std::string &flag) const;
             void printHelp() const;
 
             private:
