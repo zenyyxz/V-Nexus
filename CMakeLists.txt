@@ -44,6 +44,7 @@ set(CORE_SOURCES
     src/outbound/direct_outbound.cpp
     src/outbound/block_outbound.cpp
     src/outbound/vless_outbound.cpp
+    src/outbound/vmess_outbound.cpp
     src/engine.cpp
 )
 
@@ -74,6 +75,7 @@ if(Catch2_FOUND)
         tests/test_main.cpp
         tests/test_sniffer.cpp
         tests/test_vless.cpp
+        tests/test_vmess.cpp
         tests/test_socks5.cpp
         tests/test_router.cpp
     )

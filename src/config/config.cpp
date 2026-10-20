@@ -94,11 +94,16 @@ Config Config::load_from_json_string(const std::string& json_str) {
             out_cfg.type = get_field_or(out_j, "type", std::string("vless"));
             out_cfg.tag = get_field_or(out_j, "tag", out_cfg.type);
 
-            if (out_cfg.type == "vless") {
+            if (out_cfg.type == "vless" || out_cfg.type == "vmess") {
                 out_cfg.server = get_field_or(out_j, "server", std::string(""));
                 out_cfg.server_port = get_field_or(out_j, "server_port", static_cast<uint16_t>(443));
                 out_cfg.uuid_str = get_field_or(out_j, "uuid", std::string(""));
                 out_cfg.network = get_field_or(out_j, "network", std::string("tcp"));
+
+                if (out_cfg.type == "vmess") {
+                    out_cfg.alter_id = get_field_or(out_j, "alter_id", static_cast<uint16_t>(0));
+                    out_cfg.security = get_field_or(out_j, "security", std::string("auto"));
+                }
 
                 if (!out_cfg.uuid_str.empty()) {
                     auto parsed_uuid = UUID::from_string(out_cfg.uuid_str);

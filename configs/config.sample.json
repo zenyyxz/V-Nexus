@@ -1,8 +1,31 @@
 {
   "log": {
-    "level": "info"
+    "level": "info",
+    "output": "vnexus.log",
+    "timestamp": true
   },
   "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "zen-tun",
+      "address": [
+        "172.20.0.1/30"
+      ],
+      "mtu": 1400,
+      "auto_route": true,
+      "strict_route": true,
+      "route_exclude_address": [
+        "127.0.0.0/8",
+        "161.118.248.52/32"
+      ],
+      "sniff": true,
+      "sniff_override_destination": true,
+      "sniff_protocols": [
+        "tls",
+        "http"
+      ]
+    },
     {
       "type": "mixed",
       "tag": "mixed-in",
@@ -20,19 +43,30 @@
   "outbounds": [
     {
       "type": "vless",
-      "tag": "proxy",
-      "server": "example-vless-server.com",
+      "tag": "vless-proxy",
+      "server": "161.118.248.52",
       "server_port": 443,
-      "uuid": "27848739-7e62-4138-9fd3-098a63964b6b",
+      "uuid": "c4bd98c1-b83c-4b32-a086-40f67a7ec3ff",
       "network": "tcp",
       "tls": {
         "enabled": true,
-        "server_name": "example-vless-server.com",
-        "insecure": false,
-        "alpn": [
-          "h2",
-          "http/1.1"
-        ]
+        "server_name": "aka.ms",
+        "insecure": true
+      }
+    },
+    {
+      "type": "vmess",
+      "tag": "vmess-proxy",
+      "server": "161.118.248.52",
+      "server_port": 443,
+      "uuid": "c4bd98c1-b83c-4b32-a086-40f67a7ec3ff",
+      "alter_id": 0,
+      "security": "auto",
+      "network": "tcp",
+      "tls": {
+        "enabled": true,
+        "server_name": "aka.ms",
+        "insecure": true
       }
     },
     {
@@ -51,7 +85,7 @@
           "127.0.0.0/8",
           "10.0.0.0/8",
           "192.168.0.0/16",
-          "172.16.0.0/12"
+          "161.118.248.52/32"
         ],
         "outbound": "direct"
       },
@@ -71,6 +105,6 @@
         "outbound": "block"
       }
     ],
-    "final": "proxy"
+    "final": "vless-proxy"
   }
 }

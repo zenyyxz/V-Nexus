@@ -48,15 +48,20 @@ struct TlsConfig {
 };
 
 struct OutboundConfig {
-    std::string type{"vless"}; // vless, direct, block
+    std::string type{"vless"}; // vless, vmess, direct, block
     std::string tag{"proxy"};
     
-    // VLESS fields
+    // Server connection fields
     std::string server;
     uint16_t server_port{443};
     std::string uuid_str;
     std::optional<UUID> uuid;
     std::string network{"tcp"};
+
+    // VMess specific fields
+    uint16_t alter_id{0};
+    std::string security{"auto"}; // auto, aes-128-gcm, chacha20-poly1305, none
+
     TlsConfig tls;
 };
 

@@ -7,6 +7,7 @@
 #include "vnexus/outbound/direct_outbound.hpp"
 #include "vnexus/outbound/block_outbound.hpp"
 #include "vnexus/outbound/vless_outbound.hpp"
+#include "vnexus/outbound/vmess_outbound.hpp"
 
 namespace vnexus {
 
@@ -32,6 +33,8 @@ void Engine::init_outbounds() {
             outbounds_[out_cfg.tag] = std::make_shared<outbound::BlockOutbound>(out_cfg.tag);
         } else if (out_cfg.type == "vless") {
             outbounds_[out_cfg.tag] = std::make_shared<outbound::VlessOutbound>(ioc_, out_cfg);
+        } else if (out_cfg.type == "vmess") {
+            outbounds_[out_cfg.tag] = std::make_shared<outbound::VmessOutbound>(ioc_, out_cfg);
         } else {
             VN_WARN("[engine] unknown outbound type '{}' for tag '{}'", out_cfg.type, out_cfg.tag);
         }
