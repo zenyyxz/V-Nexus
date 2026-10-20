@@ -489,9 +489,15 @@ void TunInbound::configure_routing() {
     (void)::system(r3.c_str());
 
     // Point system DNS to the TUN device FakeIP handler (backup existing resolv.conf)
-    VN_INFO("[inbound-tun] Configuring system DNS to use TUN FakeIP resolver...");
+    std::string ip_only = config_.tun.address;
+    auto slash = ip_only.find('/');
+    if (slash != std::string::npos) ip_only = ip_only.substr(0, slash);
+    if (ip_only.empty()) ip_only = "172.19.0.1";
+
+    VN_INFO("[inbound-tun] Configuring system DNS to use TUN FakeIP resolver ({})", ip_only);
     (void)::system("cp -L /etc/resolv.conf /tmp/resolv.conf.vnexus.bak 2>/dev/null");
-    (void)::system("echo -e 'nameserver 172.19.0.1\nnameserver 1.1.1.1' > /etc/resolv.conf 2>/dev/null");
+    std::string dns_cmd = "echo -e 'nameserver " + ip_only + "\nnameserver 1.1.1.1' > /etc/resolv.conf 2>/dev/null";
+    (void)::system(dns_cmd.c_str());
 
     routes_configured_ = true;
 }

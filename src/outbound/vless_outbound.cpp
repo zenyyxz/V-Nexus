@@ -93,7 +93,7 @@ private:
 VlessOutbound::VlessOutbound(asio::io_context& ioc, config::OutboundConfig config)
     : ioc_(ioc), config_(std::move(config)) {
     if (config_.tls.enabled) {
-        ssl_ctx_ = std::make_unique<asio::ssl::context>(asio::ssl::context::tlsv12_client);
+        ssl_ctx_ = std::make_unique<asio::ssl::context>(asio::ssl::context::tls_client);
         if (config_.tls.insecure) {
             ssl_ctx_->set_verify_mode(asio::ssl::verify_none);
         } else {
@@ -235,97 +235,117 @@ void VlessOutbound::dispatch_tls(
     asio::ip::tcp::socket client_socket,
     std::vector<uint8_t> initial_payload
 ) {
-    auto resolver = std::make_shared<asio::ip::tcp::resolver>(ioc_);
     auto client_sock = std::make_shared<asio::ip::tcp::socket>(std::move(client_socket));
+    auto remote_ssl = std::make_shared<asio::ssl::stream<asio::ip::tcp::socket>>(ioc_, *ssl_ctx_);
 
-    resolver->async_resolve(config_.server, std::to_string(config_.server_port),
-        [this, session, client_sock, data = std::move(initial_payload), resolver](
-            std::error_code ec, asio::ip::tcp::resolver::results_type endpoints) mutable {
-            if (ec) {
-                VN_WARN("[vless-tls] resolve failed for server {}: {}", config_.server, ec.message());
-                return;
+    // Set SNI
+    std::string sni = config_.tls.server_name.empty() ? config_.server : config_.tls.server_name;
+    SSL_set_tlsext_host_name(remote_ssl->native_handle(), sni.c_str());
+
+    // Set ALPN if specified
+    if (!config_.tls.alpn.empty()) {
+        std::vector<unsigned char> alpn_wire;
+        for (const auto& proto : config_.tls.alpn) {
+            if (!proto.empty() && proto.size() <= 255) {
+                alpn_wire.push_back(static_cast<unsigned char>(proto.size()));
+                alpn_wire.insert(alpn_wire.end(), proto.begin(), proto.end());
             }
+        }
+        if (!alpn_wire.empty()) {
+            SSL_set_alpn_protos(remote_ssl->native_handle(), alpn_wire.data(), static_cast<unsigned int>(alpn_wire.size()));
+        }
+    }
 
-            auto remote_ssl = std::make_shared<asio::ssl::stream<asio::ip::tcp::socket>>(ioc_, *ssl_ctx_);
+    auto do_connect = [this, session, client_sock, remote_ssl, payload = std::move(initial_payload)](
+                          const asio::ip::tcp::endpoint& ep) mutable {
+        VN_INFO("[vless-tls #{}] connecting to {}:{} (target: {})...",
+                session->id, ep.address().to_string(), ep.port(), session->target_destination.to_string());
 
-            // Set SNI
-            std::string sni = config_.tls.server_name.empty() ? config_.server : config_.tls.server_name;
-            SSL_set_tlsext_host_name(remote_ssl->native_handle(), sni.c_str());
-
-            // Set ALPN if specified
-            if (!config_.tls.alpn.empty()) {
-                std::vector<unsigned char> alpn_wire;
-                for (const auto& proto : config_.tls.alpn) {
-                    if (!proto.empty() && proto.size() <= 255) {
-                        alpn_wire.push_back(static_cast<unsigned char>(proto.size()));
-                        alpn_wire.insert(alpn_wire.end(), proto.begin(), proto.end());
-                    }
+        remote_ssl->lowest_layer().async_connect(ep,
+            [this, session, client_sock, remote_ssl, payload = std::move(payload), ep](
+                std::error_code connect_ec) mutable {
+                if (connect_ec) {
+                    VN_WARN("[vless-tls #{}] TCP connect to {} failed: {}", session->id, ep.address().to_string(), connect_ec.message());
+                    return;
                 }
-                if (!alpn_wire.empty()) {
-                    SSL_set_alpn_protos(remote_ssl->native_handle(), alpn_wire.data(), static_cast<unsigned int>(alpn_wire.size()));
+
+                VN_INFO("[vless-tls #{}] TCP connected to {}, starting TLS handshake...", session->id, ep.address().to_string());
+
+                remote_ssl->async_handshake(asio::ssl::stream_base::client,
+                    [this, session, client_sock, remote_ssl, data_bytes = std::move(payload)](std::error_code hs_ec) mutable {
+                        if (hs_ec) {
+                            VN_WARN("[vless-tls #{}] TLS handshake failed: {}", session->id, hs_ec.message());
+                            return;
+                        }
+
+                        VN_INFO("[vless-tls #{}] TLS handshake completed, sending VLESS header (target: {})...",
+                                session->id, session->target_destination.to_string());
+
+                        // Build VLESS request header
+                        auto header = build_request_header(*config_.uuid, session->target_destination);
+                        if (!data_bytes.empty()) {
+                            header.insert(header.end(), data_bytes.begin(), data_bytes.end());
+                        }
+
+                        auto send_buf = std::make_shared<std::vector<uint8_t>>(std::move(header));
+                        asio::async_write(*remote_ssl, asio::buffer(*send_buf),
+                            [session, client_sock, remote_ssl, send_buf](std::error_code write_ec, size_t wlen) mutable {
+                                if (write_ec) {
+                                    VN_WARN("[vless-tls #{}] failed writing VLESS header: {}", session->id, write_ec.message());
+                                    return;
+                                }
+
+                                VN_INFO("[vless-tls #{}] sent VLESS request ({} bytes), waiting for server response...", session->id, wlen);
+
+                                auto resp_hdr = std::make_shared<std::array<uint8_t, 2>>();
+                                asio::async_read(*remote_ssl, asio::buffer(*resp_hdr),
+                                    [session, client_sock, remote_ssl, resp_hdr](std::error_code read_ec, size_t /*rlen*/) mutable {
+                                        if (read_ec) {
+                                            VN_WARN("[vless-tls #{}] failed reading server response: {}", session->id, read_ec.message());
+                                            return;
+                                        }
+
+                                        uint8_t addons_len = (*resp_hdr)[1];
+                                        VN_INFO("[vless-tls #{}] server responded (addons_len={}), starting relay", session->id, addons_len);
+
+                                        if (addons_len > 0) {
+                                            auto addons_buf = std::make_shared<std::vector<uint8_t>>(addons_len);
+                                            asio::async_read(*remote_ssl, asio::buffer(*addons_buf),
+                                                [session, client_sock, remote_ssl, addons_buf](std::error_code aec, size_t /*alen*/) mutable {
+                                                    if (!aec) {
+                                                        auto relay = std::make_shared<SslSocketRelay>(
+                                                            session, std::move(*client_sock), remote_ssl
+                                                        );
+                                                        relay->start();
+                                                    }
+                                                });
+                                        } else {
+                                            auto relay = std::make_shared<SslSocketRelay>(
+                                                session, std::move(*client_sock), remote_ssl
+                                            );
+                                            relay->start();
+                                        }
+                                    });
+                            });
+                    });
+            });
+    };
+
+    std::error_code addr_ec;
+    auto ip = asio::ip::make_address(config_.server, addr_ec);
+    if (!addr_ec) {
+        do_connect(asio::ip::tcp::endpoint(ip, config_.server_port));
+    } else {
+        auto resolver = std::make_shared<asio::ip::tcp::resolver>(ioc_);
+        resolver->async_resolve(config_.server, std::to_string(config_.server_port),
+            [session, do_connect, resolver](std::error_code ec, asio::ip::tcp::resolver::results_type endpoints) mutable {
+                if (ec) {
+                    VN_WARN("[vless-tls #{}] DNS resolve failed for server: {}", session->id, ec.message());
+                    return;
                 }
-            }
-
-            asio::async_connect(remote_ssl->lowest_layer(), endpoints,
-                [this, session, client_sock, remote_ssl, payload = std::move(data)](
-                    std::error_code connect_ec, const asio::ip::tcp::endpoint& ep) mutable {
-                    if (connect_ec) {
-                        VN_WARN("[vless-tls] TCP connect to {} failed: {}", ep.address().to_string(), connect_ec.message());
-                        return;
-                    }
-
-                    remote_ssl->async_handshake(asio::ssl::stream_base::client,
-                        [this, session, client_sock, remote_ssl, data_bytes = std::move(payload)](std::error_code hs_ec) mutable {
-                            if (hs_ec) {
-                                VN_WARN("[vless-tls] TLS handshake failed: {}", hs_ec.message());
-                                return;
-                            }
-
-                            // Build VLESS request header
-                            auto header = build_request_header(*config_.uuid, session->target_destination);
-                            if (!data_bytes.empty()) {
-                                header.insert(header.end(), data_bytes.begin(), data_bytes.end());
-                            }
-
-                            auto send_buf = std::make_shared<std::vector<uint8_t>>(std::move(header));
-                            asio::async_write(*remote_ssl, asio::buffer(*send_buf),
-                                [session, client_sock, remote_ssl, send_buf](std::error_code write_ec, size_t /*wlen*/) mutable {
-                                    if (write_ec) {
-                                        VN_WARN("[vless-tls] failed writing VLESS header: {}", write_ec.message());
-                                        return;
-                                    }
-
-                                    auto resp_hdr = std::make_shared<std::array<uint8_t, 2>>();
-                                    asio::async_read(*remote_ssl, asio::buffer(*resp_hdr),
-                                        [session, client_sock, remote_ssl, resp_hdr](std::error_code read_ec, size_t /*rlen*/) mutable {
-                                            if (read_ec) {
-                                                VN_WARN("[vless-tls] failed reading server response: {}", read_ec.message());
-                                                return;
-                                            }
-
-                                            uint8_t addons_len = (*resp_hdr)[1];
-                                            if (addons_len > 0) {
-                                                auto addons_buf = std::make_shared<std::vector<uint8_t>>(addons_len);
-                                                asio::async_read(*remote_ssl, asio::buffer(*addons_buf),
-                                                    [session, client_sock, remote_ssl, addons_buf](std::error_code aec, size_t /*alen*/) mutable {
-                                                        if (!aec) {
-                                                            auto relay = std::make_shared<SslSocketRelay>(
-                                                                session, std::move(*client_sock), remote_ssl
-                                                            );
-                                                            relay->start();
-                                                        }
-                                                    });
-                                            } else {
-                                                auto relay = std::make_shared<SslSocketRelay>(
-                                                    session, std::move(*client_sock), remote_ssl
-                                                );
-                                                relay->start();
-                                            }
-                                        });
-                                });
-                        });
-                });
-        });
+                do_connect(*endpoints.begin());
+            });
+    }
 }
 
 } // namespace vnexus::outbound

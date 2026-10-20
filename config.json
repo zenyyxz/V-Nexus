@@ -10,7 +10,7 @@
       "tag": "tun-in",
       "interface_name": "zen-tun",
       "address": [
-        "172.19.0.1/30"
+        "172.20.0.1/30"
       ],
       "mtu": 1400,
       "auto_route": true,
