@@ -6,19 +6,19 @@ namespace vnexus::net {
 
 bool is_ipv4(std::string_view host) {
     std::error_code ec;
-    auto addr = asio::ip::make_address_v4(host, ec);
+    std::ignore = asio::ip::make_address_v4(host, ec);
     return !ec;
 }
 
 bool is_ipv6(std::string_view host) {
     std::error_code ec;
-    auto addr = asio::ip::make_address_v6(host, ec);
+    std::ignore = asio::ip::make_address_v6(host, ec);
     return !ec;
 }
 
 bool is_ip_address(std::string_view host) {
     std::error_code ec;
-    auto addr = asio::ip::make_address(host, ec);
+    std::ignore = asio::ip::make_address(host, ec);
     return !ec;
 }
 

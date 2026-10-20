@@ -1,0 +1,32 @@
+[Unit]
+Description=NexusFlow - High-performance C++ networking engine
+Documentation=https://github.com/zenyyxz/vnexus-engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/NexusFlow/NexusFlow --config /opt/NexusFlow/config.json
+Restart=on-failure
+RestartSec=5s
+
+# Run as root - required for TUN device creation, iptables, and routing
+User=root
+Group=root
+
+# Working directory - binary looks for config.json relative to CWD if no --config given
+WorkingDirectory=/opt/NexusFlow
+
+# Give the process capabilities needed for networking without full root in future
+# AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+
+# Logging - stdout/stderr go directly to journald (no file logging)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nexusflow
+
+# Increase the open-file limit for many concurrent connections
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

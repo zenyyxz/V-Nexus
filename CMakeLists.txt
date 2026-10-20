@@ -9,7 +9,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(MSVC)
     add_compile_options(/W4 /permissive-)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic -O2)
+    add_compile_options(-Wall -Wextra -Wpedantic)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(-O3 -DNDEBUG)
+    else()
+        add_compile_options(-O2 -g)
+    endif()
 endif()
 
 # Find dependencies
@@ -65,8 +70,8 @@ target_compile_definitions(vnexus_core PUBLIC
 )
 
 # Main executable
-add_executable(vnexus cmd/main.cpp)
-target_link_libraries(vnexus PRIVATE vnexus_core)
+add_executable(NexusFlow cmd/main.cpp)
+target_link_libraries(NexusFlow PRIVATE vnexus_core)
 
 # Tests
 if(Catch2_FOUND)
