@@ -58,8 +58,8 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        vnexus::log::init("info");
         auto config = vnexus::config::Config::load_from_file(config_path);
+        vnexus::log::init(config.log.level, config.log.output, config.log.timestamp);
 
         if (test_mode) {
             std::cout << "Configuration file '" << config_path << "' is valid." << std::endl;
@@ -68,6 +68,9 @@ int main(int argc, char* argv[]) {
 
         print_banner();
         VN_INFO("[main] Loading configuration from '{}'...", config_path);
+        if (!config.log.output.empty()) {
+            VN_INFO("[main] Logging output to file: '{}'", config.log.output);
+        }
         vnexus::Engine engine(config);
 
         // Setup signal handling for clean exit

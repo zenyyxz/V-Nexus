@@ -44,6 +44,8 @@ Config Config::load_from_json_string(const std::string& json_str) {
     // Log section
     if (j.contains("log") && j["log"].is_object()) {
         cfg.log.level = get_field_or(j["log"], "level", std::string("info"));
+        cfg.log.output = get_field_or(j["log"], "output", std::string(""));
+        cfg.log.timestamp = get_field_or(j["log"], "timestamp", true);
     }
 
     // Inbounds

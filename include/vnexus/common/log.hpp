@@ -6,7 +6,7 @@
 
 namespace vnexus::log {
 
-void init(const std::string& level = "info");
+void init(const std::string& level = "info", const std::string& file_path = "", bool timestamp = true);
 void set_level(const std::string& level);
 
 } // namespace vnexus::log

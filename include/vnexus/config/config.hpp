@@ -10,6 +10,8 @@ namespace vnexus::config {
 
 struct LogConfig {
     std::string level{"info"};
+    std::string output;
+    bool timestamp{true};
 };
 
 struct TunConfig {

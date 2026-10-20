@@ -470,42 +470,51 @@ void TunInbound::configure_routing() {
     // Exclude VPN server IP / routes to prevent looping
     if (!default_gw_.empty() && !default_dev_.empty()) {
         for (const auto& exclude : config_.tun.route_exclude_address) {
-            std::string cmd = "ip route add " + exclude + " via " + default_gw_ + " dev " + default_dev_;
+            std::string cmd = "ip route replace " + exclude + " via " + default_gw_ + " dev " + default_dev_;
             VN_INFO("[inbound-tun] Adding bypass route: {}", cmd);
             (void)::system(cmd.c_str());
         }
     }
 
     // Add 0.0.0.0/1, 128.0.0.0/1 and FakeIP 198.18.0.0/15 routes to zen-tun
-    std::string r1 = "ip route add 0.0.0.0/1 dev " + dev;
-    std::string r2 = "ip route add 128.0.0.0/1 dev " + dev;
-    std::string r3 = "ip route add 198.18.0.0/15 dev " + dev;
+    std::string r1 = "ip route replace 0.0.0.0/1 dev " + dev;
+    std::string r2 = "ip route replace 128.0.0.0/1 dev " + dev;
+    std::string r3 = "ip route replace 198.18.0.0/15 dev " + dev;
 
     VN_INFO("[inbound-tun] Adding default VPN routes to {}", dev);
     (void)::system(r1.c_str());
     (void)::system(r2.c_str());
     (void)::system(r3.c_str());
 
+    // Point system DNS to the TUN device FakeIP handler (backup existing resolv.conf)
+    VN_INFO("[inbound-tun] Configuring system DNS to use TUN FakeIP resolver...");
+    (void)::system("cp -L /etc/resolv.conf /tmp/resolv.conf.vnexus.bak 2>/dev/null");
+    (void)::system("echo -e 'nameserver 172.19.0.1\nnameserver 1.1.1.1' > /etc/resolv.conf 2>/dev/null");
+
     routes_configured_ = true;
 }
 
 void TunInbound::restore_routing() {
     std::string dev = config_.tun.interface_name;
-    VN_INFO("[inbound-tun] Restoring system routes...");
+    VN_INFO("[inbound-tun] Restoring system routes and DNS...");
 
-    std::string r1 = "ip route del 0.0.0.0/1 dev " + dev;
-    std::string r2 = "ip route del 128.0.0.0/1 dev " + dev;
-    std::string r3 = "ip route del 198.18.0.0/15 dev " + dev;
+    std::string r1 = "ip route del 0.0.0.0/1 dev " + dev + " 2>/dev/null";
+    std::string r2 = "ip route del 128.0.0.0/1 dev " + dev + " 2>/dev/null";
+    std::string r3 = "ip route del 198.18.0.0/15 dev " + dev + " 2>/dev/null";
     (void)::system(r1.c_str());
     (void)::system(r2.c_str());
     (void)::system(r3.c_str());
 
     if (!default_gw_.empty() && !default_dev_.empty()) {
         for (const auto& exclude : config_.tun.route_exclude_address) {
-            std::string cmd = "ip route del " + exclude + " via " + default_gw_ + " dev " + default_dev_;
+            std::string cmd = "ip route del " + exclude + " 2>/dev/null";
             (void)::system(cmd.c_str());
         }
     }
+
+    // Restore resolv.conf
+    (void)::system("if [ -f /tmp/resolv.conf.vnexus.bak ]; then cp /tmp/resolv.conf.vnexus.bak /etc/resolv.conf && rm -f /tmp/resolv.conf.vnexus.bak; fi 2>/dev/null");
+
     routes_configured_ = false;
 }
 
