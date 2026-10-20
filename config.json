@@ -1,0 +1,79 @@
+{
+  "log": {
+    "level": "info"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "interface_name": "zen-tun",
+      "address": [
+        "172.19.0.1/30"
+      ],
+      "mtu": 1400,
+      "auto_route": true,
+      "strict_route": true,
+      "route_exclude_address": [
+        "127.0.0.0/8",
+        "161.118.248.52/32"
+      ],
+      "sniff": true,
+      "sniff_override_destination": true,
+      "sniff_protocols": [
+        "tls",
+        "http"
+      ]
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 10808,
+      "sniff": true,
+      "sniff_override_destination": true,
+      "sniff_protocols": [
+        "tls",
+        "http"
+      ]
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "vless",
+      "tag": "proxy",
+      "server": "161.118.248.52",
+      "server_port": 443,
+      "uuid": "c4bd98c1-b83c-4b32-a086-40f67a7ec3ff",
+      "network": "tcp",
+      "tls": {
+        "enabled": true,
+        "server_name": "aka.ms",
+        "insecure": true,
+        "alpn": [
+          "h2",
+          "http/1.1"
+        ]
+      }
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "ip_cidr": [
+          "127.0.0.0/8",
+          "161.118.248.52/32"
+        ],
+        "outbound": "direct"
+      }
+    ],
+    "final": "proxy"
+  }
+}

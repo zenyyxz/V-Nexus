@@ -1,0 +1,129 @@
+{
+  "dns": {
+    "final": "dns-remote",
+    "independent_cache": true,
+    "rules": [
+      {
+        "domain": [
+          "161.118.248.52"
+        ],
+        "server": "dns-bootstrap"
+      },
+      {
+        "query_type": [
+          "A",
+          "AAAA"
+        ],
+        "rewrite_ttl": 1,
+        "server": "dns-fakeip"
+      }
+    ],
+    "servers": [
+      {
+        "detour": "proxy",
+        "server": "1.1.1.1",
+        "server_port": 443,
+        "tag": "dns-remote",
+        "type": "https"
+      },
+      {
+        "tag": "dns-bootstrap",
+        "type": "local"
+      },
+      {
+        "inet4_range": "198.18.0.0/15",
+        "inet6_range": "fc00::/18",
+        "tag": "dns-fakeip",
+        "type": "fakeip"
+      }
+    ],
+    "strategy": "prefer_ipv4"
+  },
+  "inbounds": [
+    {
+      "address": [
+        "172.19.0.1/30"
+      ],
+      "auto_route": true,
+      "interface_name": "zen-tun",
+      "mtu": 1400,
+      "route_exclude_address": [
+        "127.0.0.0/8",
+        "161.118.248.52/32"
+      ],
+      "stack": "system",
+      "strict_route": true,
+      "tag": "tun-in",
+      "type": "tun"
+    },
+    {
+      "listen": "127.0.0.1",
+      "listen_port": 53,
+      "tag": "dns-in",
+      "type": "direct"
+    }
+  ],
+  "log": {
+    "level": "info",
+    "output": "/home/zenyyxz/dotfiles/vpn/arch-vpn/box.log",
+    "timestamp": true
+  },
+  "outbounds": [
+    {
+      "server": "161.118.248.52",
+      "server_port": 443,
+      "tag": "proxy",
+      "tls": {
+        "enabled": true,
+        "insecure": true,
+        "server_name": "aka.ms"
+      },
+      "type": "vless",
+      "uuid": "c4bd98c1-b83c-4b32-a086-40f67a7ec3ff"
+    },
+    {
+      "tag": "direct",
+      "type": "direct"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "default_domain_resolver": "dns-bootstrap",
+    "final": "proxy",
+    "rules": [
+      {
+        "action": "hijack-dns",
+        "protocol": "dns"
+      },
+      {
+        "action": "hijack-dns",
+        "port": 53
+      },
+      {
+        "action": "route",
+        "domain": [
+          "161.118.248.52"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "action": "route",
+        "ip_cidr": [
+          "161.118.248.52/32"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "action": "sniff",
+        "inbound": [
+          "tun-in"
+        ],
+        "protocol": [
+          "http",
+          "tls",
+          "quic"
+        ]
+      }
+    ]
+  }
+}
