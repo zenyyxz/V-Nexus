@@ -106,7 +106,7 @@ void Engine::start() {
     for (auto& in : inbounds_) {
         in->start();
     }
-    VN_INFO("[engine] vnexus-engine successfully started with {} inbounds and {} outbounds",
+    VN_INFO("[engine] NexusFlow successfully started with {} inbounds and {} outbounds",
             inbounds_.size(), outbounds_.size());
 }
 
@@ -124,7 +124,7 @@ void Engine::stop() {
     }
     work_guard_.reset();
     ioc_.stop();
-    VN_INFO("[engine] vnexus-engine stopped");
+    VN_INFO("[engine] NexusFlow stopped");
 }
 
 } // namespace vnexus

@@ -5,9 +5,9 @@ import socket
 import sys
 
 def test_engine():
-    print("[E2E] Starting vnexus engine...")
+    print("[E2E] Starting NexusFlow engine...")
     proc = subprocess.Popen(
-        ["./build/vnexus", "--config", "config.json"],
+        ["./build/NexusFlow", "--config", "config.json"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True

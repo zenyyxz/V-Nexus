@@ -53,6 +53,7 @@ public:
     [[nodiscard]] uint16_t listen_port() const override { return 0; }
 
     // Packet output to TUN interface
+    void write_packet(const uint8_t* data, size_t len);
     void write_packet(std::vector<uint8_t> packet);
 
     // Remove finished TCP connection
@@ -94,9 +95,13 @@ private:
     std::unordered_map<std::string, std::string> domain_to_fakeip_;
     std::unordered_map<std::string, std::string> fakeip_to_domain_;
 
+    void start_cleanup_timer();
+    void cleanup_stale_sessions();
+
     // TCP session table
     std::mutex tcp_mutex_;
     std::unordered_map<TunTcpKey, std::shared_ptr<TunTcpConnection>, TunTcpKeyHash> tcp_sessions_;
+    asio::steady_timer cleanup_timer_;
 };
 
 } // namespace vnexus::inbound

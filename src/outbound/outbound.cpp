@@ -95,8 +95,8 @@ private:
     std::shared_ptr<SessionContext> session_;
     asio::ip::tcp::socket client_;
     asio::ip::tcp::socket remote_;
-    std::array<uint8_t, 32768> client_buf_{};
-    std::array<uint8_t, 32768> remote_buf_{};
+    std::array<uint8_t, 16384> client_buf_{};
+    std::array<uint8_t, 16384> remote_buf_{};
     bool closed_{false};
 };
 

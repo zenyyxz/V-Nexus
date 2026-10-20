@@ -14,6 +14,11 @@
 #include <cstdlib>
 #include <array>
 #include <sstream>
+#include <deque>
+#include <chrono>
+#if defined(__linux__)
+#include <malloc.h>
+#endif
 
 namespace vnexus::inbound {
 
@@ -109,9 +114,17 @@ public:
         target_domain_(std::move(target_domain)),
         cfg_(cfg),
         sniffer_(sniffer),
-        dispatcher_(std::move(dispatcher)) {}
+        dispatcher_(std::move(dispatcher)),
+        last_activity_(std::chrono::steady_clock::now()) {}
+
+    bool is_idle(std::chrono::seconds timeout) const {
+        return (std::chrono::steady_clock::now() - last_activity_) > timeout;
+    }
+
+    State state() const { return state_; }
 
     void handle_packet(const uint8_t* tcp_hdr, size_t /*tcp_len*/, const uint8_t* payload, size_t payload_len) {
+        last_activity_ = std::chrono::steady_clock::now();
         uint8_t flags = tcp_hdr[13];
         uint32_t seq  = (static_cast<uint32_t>(tcp_hdr[4]) << 24) |
                         (static_cast<uint32_t>(tcp_hdr[5]) << 16) |
@@ -165,13 +178,7 @@ public:
                 // Dispatch immediately — we have at least the first data chunk
                 do_dispatch(res);
             } else if (pipe_write_sock_) {
-                // Already dispatched: funnel subsequent data to the pipe
-                auto self = shared_from_this();
-                auto buf  = std::make_shared<std::vector<uint8_t>>(payload, payload + payload_len);
-                asio::async_write(*pipe_write_sock_, asio::buffer(*buf),
-                    [this, self, buf](std::error_code ec, size_t) {
-                        if (ec) close();
-                    });
+                enqueue_pipe_write(payload, payload_len);
             }
         }
     }
@@ -181,6 +188,16 @@ public:
         my_seq_ = my_isn_;
         send_tcp_packet(0x12); // SYN | ACK
         my_seq_ = saved;
+    }
+
+    void close() {
+        if (state_ == State::CLOSED) return;
+        state_ = State::CLOSED;
+        if (pipe_write_sock_) {
+            std::error_code ec;
+            pipe_write_sock_->close(ec);
+        }
+        tun_.remove_connection(key_);
     }
 
 private:
@@ -257,6 +274,33 @@ private:
         dispatcher_(session, std::move(dispatcher_sock), std::move(initial_payload_));
     }
 
+    void enqueue_pipe_write(const uint8_t* payload, size_t payload_len) {
+        if (!pipe_write_sock_ || !pipe_write_sock_->is_open() || payload_len == 0) return;
+        bool write_in_progress = !pipe_write_queue_.empty();
+        pipe_write_queue_.emplace_back(payload, payload + payload_len);
+        if (!write_in_progress) {
+            do_pipe_write();
+        }
+    }
+
+    void do_pipe_write() {
+        if (pipe_write_queue_.empty() || !pipe_write_sock_ || !pipe_write_sock_->is_open()) return;
+        auto self = shared_from_this();
+        asio::async_write(*pipe_write_sock_, asio::buffer(pipe_write_queue_.front()),
+            [this, self](std::error_code ec, size_t /*wlen*/) {
+                if (ec) {
+                    close();
+                    return;
+                }
+                if (!pipe_write_queue_.empty()) {
+                    pipe_write_queue_.pop_front();
+                }
+                if (!pipe_write_queue_.empty()) {
+                    do_pipe_write();
+                }
+            });
+    }
+
     // Read data flowing back from the outbound and inject into TUN as TCP packets
     void do_read_from_pipe() {
         if (!pipe_write_sock_) return;
@@ -264,6 +308,7 @@ private:
         pipe_write_sock_->async_read_some(asio::buffer(read_buf_),
             [this, self](std::error_code ec, size_t len) {
                 if (!ec && len > 0) {
+                    last_activity_ = std::chrono::steady_clock::now();
                     // Chunk into MSS-sized TCP data packets
                     size_t off = 0;
                     while (off < len) {
@@ -286,7 +331,10 @@ private:
 
     void send_tcp_packet(uint8_t flags, const uint8_t* payload = nullptr, size_t payload_len = 0) {
         size_t total_len = 20 + 20 + payload_len;
-        std::vector<uint8_t> pkt(total_len, 0);
+        if (total_len > 1600) return;
+
+        uint8_t pkt[1600];
+        std::memset(pkt, 0, 40);
 
         // IPv4 header
         pkt[0]  = 0x45;
@@ -307,7 +355,7 @@ private:
         pkt[18] = static_cast<uint8_t>((key_.src_ip >> 8) & 0xFF);
         pkt[19] = static_cast<uint8_t>(key_.src_ip & 0xFF);
 
-        uint16_t ip_csum = compute_checksum(pkt.data(), 20);
+        uint16_t ip_csum = compute_checksum(pkt, 20);
         pkt[10] = static_cast<uint8_t>(ip_csum >> 8);
         pkt[11] = static_cast<uint8_t>(ip_csum & 0xFF);
 
@@ -329,7 +377,7 @@ private:
 
         pkt[32] = 0x50; // data offset 5 (20 bytes)
         pkt[33] = flags;
-        pkt[34] = 0xFF; // window high
+        pkt[34] = 0xFF; // window high (65535)
         pkt[35] = 0xFF; // window low
 
         if (payload && payload_len > 0) {
@@ -340,17 +388,7 @@ private:
         pkt[36] = static_cast<uint8_t>(tcp_csum >> 8);
         pkt[37] = static_cast<uint8_t>(tcp_csum & 0xFF);
 
-        tun_.write_packet(std::move(pkt));
-    }
-
-    void close() {
-        if (state_ == State::CLOSED) return;
-        state_ = State::CLOSED;
-        if (pipe_write_sock_) {
-            std::error_code ec;
-            pipe_write_sock_->close(ec);
-        }
-        tun_.remove_connection(key_);
+        tun_.write_packet(pkt, total_len);
     }
 
     TunInbound&              tun_;
@@ -370,6 +408,8 @@ private:
     std::vector<uint8_t>     initial_payload_;
     std::unique_ptr<asio::ip::tcp::socket> pipe_write_sock_;
     std::array<uint8_t, 16384> read_buf_{};
+    std::chrono::steady_clock::time_point last_activity_{std::chrono::steady_clock::now()};
+    std::deque<std::vector<uint8_t>> pipe_write_queue_;
 };
 
 // =========================================================================
@@ -386,7 +426,8 @@ TunInbound::TunInbound(
     config_(std::move(config)),
     sniffer_(std::move(sniffer)),
     dispatcher_(std::move(dispatcher)),
-    read_buffer_(65536) {}
+    read_buffer_(65536),
+    cleanup_timer_(ioc) {}
 
 TunInbound::~TunInbound() {
     stop();
@@ -397,15 +438,23 @@ void TunInbound::start() {
     if (config_.tun.auto_route) {
         configure_routing();
     }
+    start_cleanup_timer();
     do_read();
 }
 
 void TunInbound::stop() {
+    cleanup_timer_.cancel();
+    std::error_code ec;
+
+    {
+        std::lock_guard<std::mutex> lock(tcp_mutex_);
+        tcp_sessions_.clear();
+    }
+
     if (routes_configured_) {
         restore_routing();
     }
     if (tun_stream_ && tun_stream_->is_open()) {
-        std::error_code ec;
         tun_stream_->close(ec);
     }
     if (tun_fd_ >= 0) {
@@ -542,16 +591,53 @@ void TunInbound::do_read() {
         });
 }
 
+void TunInbound::write_packet(const uint8_t* data, size_t len) {
+    if (tun_fd_ < 0 || !data || len == 0) return;
+    ssize_t n = ::write(tun_fd_, data, len);
+    if (n < 0 && (errno != EAGAIN && errno != EWOULDBLOCK)) {
+        VN_DEBUG("[inbound-tun] Packet write error: {}", strerror(errno));
+    }
+}
+
 void TunInbound::write_packet(std::vector<uint8_t> packet) {
-    if (!tun_stream_ || !tun_stream_->is_open()) return;
-    auto self = shared_from_this();
-    auto buf = std::make_shared<std::vector<uint8_t>>(std::move(packet));
-    asio::async_write(*tun_stream_, asio::buffer(*buf),
-        [self, buf](std::error_code ec, size_t /*wlen*/) {
-            if (ec && ec != asio::error::operation_aborted) {
-                VN_DEBUG("[inbound-tun] Packet write error: {}", ec.message());
+    write_packet(packet.data(), packet.size());
+}
+
+void TunInbound::start_cleanup_timer() {
+    cleanup_timer_.expires_after(std::chrono::seconds(15));
+    cleanup_timer_.async_wait([this, self = shared_from_this()](std::error_code ec) {
+        if (!ec) {
+            cleanup_stale_sessions();
+            start_cleanup_timer();
+        }
+    });
+}
+
+void TunInbound::cleanup_stale_sessions() {
+    std::vector<std::shared_ptr<TunTcpConnection>> to_close;
+    {
+        std::lock_guard<std::mutex> lock(tcp_mutex_);
+        auto it = tcp_sessions_.begin();
+        while (it != tcp_sessions_.end()) {
+            if (!it->second || it->second->state() == TunTcpConnection::State::CLOSED ||
+                it->second->is_idle(std::chrono::seconds(60))) {
+                to_close.push_back(it->second);
+                it = tcp_sessions_.erase(it);
+            } else {
+                ++it;
             }
-        });
+        }
+    }
+
+    for (auto& conn : to_close) {
+        if (conn) {
+            conn->close();
+        }
+    }
+
+#if defined(__linux__)
+    malloc_trim(0);
+#endif
 }
 
 void TunInbound::remove_connection(const TunTcpKey& key) {
