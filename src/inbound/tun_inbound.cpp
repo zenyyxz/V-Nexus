@@ -413,6 +413,250 @@ private:
 };
 
 // =========================================================================
+// TunUdpConnection
+// =========================================================================
+
+class TunUdpConnection : public std::enable_shared_from_this<TunUdpConnection> {
+public:
+    TunUdpConnection(
+        TunInbound& tun,
+        asio::io_context& ioc,
+        uint64_t session_id,
+        TunUdpKey key,
+        std::string target_domain,
+        config::InboundConfig cfg,
+        DispatchHandler dispatcher
+    ) : tun_(tun),
+        ioc_(ioc),
+        session_id_(session_id),
+        key_(key),
+        target_domain_(std::move(target_domain)),
+        cfg_(std::move(cfg)),
+        dispatcher_(std::move(dispatcher)),
+        last_activity_(std::chrono::steady_clock::now()) {}
+
+    void start(const uint8_t* payload, size_t payload_len) {
+        int sv[2];
+        if (::socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, sv) < 0) {
+            VN_ERROR("[tun-udp #{}] socketpair failed: {}", session_id_, strerror(errno));
+            close();
+            return;
+        }
+
+        pipe_write_sock_ = std::make_unique<asio::ip::tcp::socket>(ioc_);
+        std::error_code ec;
+        pipe_write_sock_->assign(asio::ip::tcp::v4(), sv[0], ec);
+        if (ec) {
+            ::close(sv[0]); ::close(sv[1]);
+            VN_ERROR("[tun-udp #{}] assign sv[0] failed: {}", session_id_, ec.message());
+            close();
+            return;
+        }
+
+        asio::ip::tcp::socket dispatcher_sock(ioc_);
+        dispatcher_sock.assign(asio::ip::tcp::v4(), sv[1], ec);
+        if (ec) {
+            ::close(sv[1]);
+            VN_ERROR("[tun-udp #{}] assign sv[1] failed: {}", session_id_, ec.message());
+            close();
+            return;
+        }
+
+        auto session = std::make_shared<SessionContext>();
+        session->id = session_id_;
+        session->inbound_tag = cfg_.tag;
+        session->command = NetworkCommand::UDP;
+        session->client_endpoint = asio::ip::tcp::endpoint(
+            asio::ip::address_v4(key_.src_ip), key_.src_port);
+
+        EndpointAddress dest;
+        dest.port = key_.dst_port;
+        if (!target_domain_.empty()) {
+            dest.host = target_domain_;
+            dest.type = AddressType::Domain;
+        } else {
+            dest.host = asio::ip::address_v4(key_.dst_ip).to_string();
+            dest.type = AddressType::IPv4;
+        }
+        session->original_destination = dest;
+        session->target_destination   = dest;
+
+        VN_INFO("[tun-udp #{}] New UDP session: {}:{} -> {}:{}",
+                session_id_,
+                asio::ip::address_v4(key_.src_ip).to_string(), key_.src_port,
+                dest.host, dest.port);
+
+        // Frame initial datagram: [uint16_t len][payload]
+        std::vector<uint8_t> initial_framed;
+        if (payload_len > 0) {
+            initial_framed.reserve(2 + payload_len);
+            initial_framed.push_back(static_cast<uint8_t>((payload_len >> 8) & 0xFF));
+            initial_framed.push_back(static_cast<uint8_t>(payload_len & 0xFF));
+            initial_framed.insert(initial_framed.end(), payload, payload + payload_len);
+        }
+
+        last_activity_ = std::chrono::steady_clock::now();
+
+        do_read_from_pipe();
+
+        dispatcher_(session, std::move(dispatcher_sock), std::move(initial_framed));
+    }
+
+    void send_packet(const uint8_t* payload, size_t payload_len) {
+        if (closed_) return;
+        last_activity_ = std::chrono::steady_clock::now();
+
+        std::vector<uint8_t> frame;
+        frame.reserve(2 + payload_len);
+        frame.push_back(static_cast<uint8_t>((payload_len >> 8) & 0xFF));
+        frame.push_back(static_cast<uint8_t>(payload_len & 0xFF));
+        frame.insert(frame.end(), payload, payload + payload_len);
+
+        enqueue_pipe_write(std::move(frame));
+    }
+
+    [[nodiscard]] bool is_idle(std::chrono::seconds timeout) const {
+        auto now = std::chrono::steady_clock::now();
+        return (now - last_activity_) >= timeout;
+    }
+
+    void close() {
+        if (closed_) return;
+        closed_ = true;
+        if (pipe_write_sock_) {
+            std::error_code ec;
+            pipe_write_sock_->close(ec);
+        }
+        tun_.remove_udp_connection(key_);
+    }
+
+private:
+    void enqueue_pipe_write(std::vector<uint8_t> frame) {
+        if (!pipe_write_sock_ || !pipe_write_sock_->is_open() || closed_) return;
+        bool write_in_progress = !pipe_write_queue_.empty();
+        pipe_write_queue_.push_back(std::move(frame));
+        if (!write_in_progress) {
+            do_pipe_write();
+        }
+    }
+
+    void do_pipe_write() {
+        if (pipe_write_queue_.empty() || !pipe_write_sock_ || !pipe_write_sock_->is_open() || closed_) return;
+        auto self = shared_from_this();
+        asio::async_write(*pipe_write_sock_, asio::buffer(pipe_write_queue_.front()),
+            [this, self](std::error_code ec, size_t /*wlen*/) {
+                if (ec) {
+                    close();
+                    return;
+                }
+                if (!pipe_write_queue_.empty()) {
+                    pipe_write_queue_.pop_front();
+                }
+                if (!pipe_write_queue_.empty()) {
+                    do_pipe_write();
+                }
+            });
+    }
+
+    void do_read_from_pipe() {
+        if (!pipe_write_sock_ || closed_) return;
+        auto self = shared_from_this();
+        pipe_write_sock_->async_read_some(asio::buffer(read_raw_),
+            [this, self](std::error_code ec, size_t len) {
+                if (!ec && len > 0) {
+                    last_activity_ = std::chrono::steady_clock::now();
+                    pending_frames_.insert(pending_frames_.end(), read_raw_.data(), read_raw_.data() + len);
+
+                    while (pending_frames_.size() >= 2) {
+                        uint16_t frame_len = (static_cast<uint16_t>(pending_frames_[0]) << 8) | pending_frames_[1];
+                        size_t needed = 2 + static_cast<size_t>(frame_len);
+                        if (pending_frames_.size() < needed) {
+                            break;
+                        }
+                        send_udp_packet(pending_frames_.data() + 2, frame_len);
+                        pending_frames_.erase(pending_frames_.begin(), pending_frames_.begin() + needed);
+                    }
+
+                    do_read_from_pipe();
+                } else {
+                    close();
+                }
+            });
+    }
+
+    void send_udp_packet(const uint8_t* payload, size_t payload_len) {
+        if (payload_len > 1472) return;
+
+        uint8_t pkt[1600];
+        size_t total_len = 20 + 8 + payload_len;
+
+        // IPv4 Header
+        pkt[0] = 0x45;
+        pkt[1] = 0x00;
+        pkt[2] = static_cast<uint8_t>(total_len >> 8);
+        pkt[3] = static_cast<uint8_t>(total_len & 0xFF);
+        pkt[4] = 0x00;
+        pkt[5] = 0x00;
+        pkt[6] = 0x40; // DF
+        pkt[7] = 0x00;
+        pkt[8] = 64;   // TTL
+        pkt[9] = 17;   // UDP
+        pkt[10] = 0x00;
+        pkt[11] = 0x00;
+
+        // Remote (dst_ip) -> Local (src_ip)
+        pkt[12] = static_cast<uint8_t>(key_.dst_ip >> 24);
+        pkt[13] = static_cast<uint8_t>((key_.dst_ip >> 16) & 0xFF);
+        pkt[14] = static_cast<uint8_t>((key_.dst_ip >> 8) & 0xFF);
+        pkt[15] = static_cast<uint8_t>(key_.dst_ip & 0xFF);
+
+        pkt[16] = static_cast<uint8_t>(key_.src_ip >> 24);
+        pkt[17] = static_cast<uint8_t>((key_.src_ip >> 16) & 0xFF);
+        pkt[18] = static_cast<uint8_t>((key_.src_ip >> 8) & 0xFF);
+        pkt[19] = static_cast<uint8_t>(key_.src_ip & 0xFF);
+
+        uint16_t ip_csum = compute_checksum(pkt, 20);
+        pkt[10] = static_cast<uint8_t>(ip_csum >> 8);
+        pkt[11] = static_cast<uint8_t>(ip_csum & 0xFF);
+
+        // UDP Header
+        pkt[20] = static_cast<uint8_t>(key_.dst_port >> 8);
+        pkt[21] = static_cast<uint8_t>(key_.dst_port & 0xFF);
+        pkt[22] = static_cast<uint8_t>(key_.src_port >> 8);
+        pkt[23] = static_cast<uint8_t>(key_.src_port & 0xFF);
+
+        uint16_t udp_len = static_cast<uint16_t>(8 + payload_len);
+        pkt[24] = static_cast<uint8_t>(udp_len >> 8);
+        pkt[25] = static_cast<uint8_t>(udp_len & 0xFF);
+        pkt[26] = 0x00;
+        pkt[27] = 0x00;
+
+        std::memcpy(&pkt[28], payload, payload_len);
+
+        uint16_t udp_csum = udp_checksum(key_.dst_ip, key_.src_ip, &pkt[20], udp_len);
+        pkt[26] = static_cast<uint8_t>(udp_csum >> 8);
+        pkt[27] = static_cast<uint8_t>(udp_csum & 0xFF);
+
+        tun_.write_packet(pkt, total_len);
+    }
+
+    TunInbound&              tun_;
+    asio::io_context&        ioc_;
+    uint64_t                 session_id_;
+    TunUdpKey                key_;
+    std::string              target_domain_;
+    config::InboundConfig    cfg_;
+    DispatchHandler          dispatcher_;
+
+    bool                     closed_{false};
+    std::unique_ptr<asio::ip::tcp::socket> pipe_write_sock_;
+    std::array<uint8_t, 4096> read_raw_{};
+    std::vector<uint8_t>     pending_frames_;
+    std::chrono::steady_clock::time_point last_activity_{std::chrono::steady_clock::now()};
+    std::deque<std::vector<uint8_t>> pipe_write_queue_;
+};
+
+// =========================================================================
 // TunInbound Implementation
 // =========================================================================
 
@@ -538,14 +782,9 @@ void TunInbound::configure_routing() {
     (void)::system(r3.c_str());
 
     // Point system DNS to the TUN device FakeIP handler (backup existing resolv.conf)
-    std::string ip_only = config_.tun.address;
-    auto slash = ip_only.find('/');
-    if (slash != std::string::npos) ip_only = ip_only.substr(0, slash);
-    if (ip_only.empty()) ip_only = "172.19.0.1";
-
-    VN_INFO("[inbound-tun] Configuring system DNS to use TUN FakeIP resolver ({})", ip_only);
+    VN_INFO("[inbound-tun] Configuring system DNS to use TUN FakeIP resolver (198.18.0.1)");
     (void)::system("cp -L /etc/resolv.conf /tmp/resolv.conf.vnexus.bak 2>/dev/null");
-    std::string dns_cmd = "echo -e 'nameserver " + ip_only + "\nnameserver 1.1.1.1' > /etc/resolv.conf 2>/dev/null";
+    std::string dns_cmd = "echo -e 'nameserver 198.18.0.1\nnameserver 1.1.1.1' > /etc/resolv.conf 2>/dev/null";
     (void)::system(dns_cmd.c_str());
 
     routes_configured_ = true;
@@ -614,14 +853,14 @@ void TunInbound::start_cleanup_timer() {
 }
 
 void TunInbound::cleanup_stale_sessions() {
-    std::vector<std::shared_ptr<TunTcpConnection>> to_close;
+    std::vector<std::shared_ptr<TunTcpConnection>> to_close_tcp;
     {
         std::lock_guard<std::mutex> lock(tcp_mutex_);
         auto it = tcp_sessions_.begin();
         while (it != tcp_sessions_.end()) {
             if (!it->second || it->second->state() == TunTcpConnection::State::CLOSED ||
                 it->second->is_idle(std::chrono::seconds(60))) {
-                to_close.push_back(it->second);
+                to_close_tcp.push_back(it->second);
                 it = tcp_sessions_.erase(it);
             } else {
                 ++it;
@@ -629,7 +868,27 @@ void TunInbound::cleanup_stale_sessions() {
         }
     }
 
-    for (auto& conn : to_close) {
+    for (auto& conn : to_close_tcp) {
+        if (conn) {
+            conn->close();
+        }
+    }
+
+    std::vector<std::shared_ptr<TunUdpConnection>> to_close_udp;
+    {
+        std::lock_guard<std::mutex> lock(udp_mutex_);
+        auto it = udp_sessions_.begin();
+        while (it != udp_sessions_.end()) {
+            if (!it->second || it->second->is_idle(std::chrono::seconds(30))) {
+                to_close_udp.push_back(it->second);
+                it = udp_sessions_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    for (auto& conn : to_close_udp) {
         if (conn) {
             conn->close();
         }
@@ -643,6 +902,11 @@ void TunInbound::cleanup_stale_sessions() {
 void TunInbound::remove_connection(const TunTcpKey& key) {
     std::lock_guard<std::mutex> lock(tcp_mutex_);
     tcp_sessions_.erase(key);
+}
+
+void TunInbound::remove_udp_connection(const TunUdpKey& key) {
+    std::lock_guard<std::mutex> lock(udp_mutex_);
+    udp_sessions_.erase(key);
 }
 
 std::string TunInbound::get_or_create_fakeip(const std::string& domain) {
@@ -689,15 +953,140 @@ void TunInbound::handle_packet(std::vector<uint8_t> packet) {
     if (protocol == 1) { // ICMP
         handle_icmp(packet, ip_hdr_len);
     } else if (protocol == 17) { // UDP
-        // Check dst port 53 for DNS, otherwise ignore
-        if (packet.size() > ip_hdr_len + 3) {
-            uint16_t dst_port = (static_cast<uint16_t>(packet[ip_hdr_len + 2]) << 8) | packet[ip_hdr_len + 3];
-            if (dst_port == 53) {
-                handle_dns(packet, ip_hdr_len);
-            }
-        }
+        handle_udp(packet, ip_hdr_len);
     } else if (protocol == 6) { // TCP
         handle_tcp(packet, ip_hdr_len);
+    }
+}
+
+void TunInbound::send_icmp_unreachable(const std::vector<uint8_t>& orig_pkt, size_t orig_ip_len) {
+    if (orig_pkt.size() < orig_ip_len + 8) return;
+    uint8_t pkt[64];
+    size_t payload_len = orig_ip_len + 8; // Original IP header + 8 bytes of UDP
+    size_t icmp_total = 8 + payload_len;
+    size_t total_len = 20 + icmp_total;
+
+    // IPv4 Header
+    pkt[0] = 0x45;
+    pkt[1] = 0x00;
+    pkt[2] = static_cast<uint8_t>(total_len >> 8);
+    pkt[3] = static_cast<uint8_t>(total_len & 0xFF);
+    pkt[4] = 0x00;
+    pkt[5] = 0x00;
+    pkt[6] = 0x00;
+    pkt[7] = 0x00;
+    pkt[8] = 64;   // TTL
+    pkt[9] = 1;    // ICMP
+    pkt[10] = 0x00;
+    pkt[11] = 0x00;
+
+    // Source IP: original destination IP
+    std::memcpy(&pkt[12], &orig_pkt[16], 4);
+    // Destination IP: original source IP
+    std::memcpy(&pkt[16], &orig_pkt[12], 4);
+
+    uint16_t ip_csum = compute_checksum(pkt, 20);
+    pkt[10] = static_cast<uint8_t>(ip_csum >> 8);
+    pkt[11] = static_cast<uint8_t>(ip_csum & 0xFF);
+
+    // ICMP Header
+    pkt[20] = 3; // Type: Destination Unreachable
+    pkt[21] = 3; // Code: Port Unreachable
+    pkt[22] = 0; // Checksum placeholder
+    pkt[23] = 0;
+    pkt[24] = 0; // Unused 4 bytes
+    pkt[25] = 0;
+    pkt[26] = 0;
+    pkt[27] = 0;
+
+    // Copy original IP header + 8 bytes of UDP payload
+    std::memcpy(&pkt[28], orig_pkt.data(), payload_len);
+
+    uint16_t icmp_csum = compute_checksum(&pkt[20], icmp_total);
+    pkt[22] = static_cast<uint8_t>(icmp_csum >> 8);
+    pkt[23] = static_cast<uint8_t>(icmp_csum & 0xFF);
+
+    write_packet(pkt, total_len);
+}
+
+void TunInbound::handle_udp(std::vector<uint8_t>& packet, size_t ip_hdr_len) {
+    if (packet.size() < ip_hdr_len + 8) return;
+
+    const uint8_t* udp = &packet[ip_hdr_len];
+    uint16_t src_port = (static_cast<uint16_t>(udp[0]) << 8) | udp[1];
+    uint16_t dst_port = (static_cast<uint16_t>(udp[2]) << 8) | udp[3];
+    uint16_t udp_len  = (static_cast<uint16_t>(udp[4]) << 8) | udp[5];
+
+    if (dst_port == 53) {
+        handle_dns(packet, ip_hdr_len);
+        return;
+    }
+
+    uint32_t src_ip_n = (static_cast<uint32_t>(packet[12]) << 24) |
+                        (static_cast<uint32_t>(packet[13]) << 16) |
+                        (static_cast<uint32_t>(packet[14]) << 8)  |
+                        packet[15];
+    uint32_t dst_ip_n = (static_cast<uint32_t>(packet[16]) << 24) |
+                        (static_cast<uint32_t>(packet[17]) << 16) |
+                        (static_cast<uint32_t>(packet[18]) << 8)  |
+                        packet[19];
+
+    // Filter out invalid/multicast/broadcast destinations
+    if ((dst_ip_n & 0xF0000000) == 0xE0000000 || dst_ip_n == 0xFFFFFFFF || (dst_ip_n & 0xFF000000) == 0x7F000000) {
+        return;
+    }
+
+    // Port 443 UDP is QUIC: reject with ICMP Port Unreachable so browser/client immediately falls back to TCP
+    if (dst_port == 443) {
+        send_icmp_unreachable(packet, ip_hdr_len);
+        return;
+    }
+
+    size_t payload_len = 0;
+    const uint8_t* payload = nullptr;
+    if (udp_len >= 8 && packet.size() >= ip_hdr_len + udp_len) {
+        payload_len = udp_len - 8;
+        payload = udp + 8;
+    } else if (packet.size() > ip_hdr_len + 8) {
+        payload_len = packet.size() - ip_hdr_len - 8;
+        payload = udp + 8;
+    }
+
+    TunUdpKey key{
+        .src_ip = src_ip_n,
+        .src_port = src_port,
+        .dst_ip = dst_ip_n,
+        .dst_port = dst_port
+    };
+
+    std::shared_ptr<TunUdpConnection> session;
+    {
+        std::lock_guard<std::mutex> lock(udp_mutex_);
+        auto it = udp_sessions_.find(key);
+        if (it != udp_sessions_.end()) {
+            session = it->second;
+        }
+    }
+
+    if (session) {
+        if (payload_len > 0) {
+            session->send_packet(payload, payload_len);
+        }
+    } else {
+        std::string dst_addr_str = asio::ip::address_v4(dst_ip_n).to_string();
+        std::string domain = get_domain_for_fakeip(dst_addr_str);
+
+        uint64_t id = session_counter_.fetch_add(1);
+        session = std::make_shared<TunUdpConnection>(
+            *this, ioc_, id, key, domain, config_, dispatcher_
+        );
+
+        {
+            std::lock_guard<std::mutex> lock(udp_mutex_);
+            udp_sessions_[key] = session;
+        }
+
+        session->start(payload, payload_len);
     }
 }
 
@@ -750,8 +1139,10 @@ void TunInbound::handle_dns(std::vector<uint8_t>& packet, size_t ip_hdr_len) {
     std::string domain = parse_dns_qname(dns, dns_len, q_offset);
     if (domain.empty() || q_offset + 4 > dns_len) return;
 
-    [[maybe_unused]] uint16_t qtype = (static_cast<uint16_t>(dns[q_offset]) << 8) | dns[q_offset + 1];
+    uint16_t qtype = (static_cast<uint16_t>(dns[q_offset]) << 8) | dns[q_offset + 1];
     q_offset += 4; // Skip QTYPE and QCLASS
+
+    bool is_type_a = (qtype == 1);
 
     // Build DNS Response
     std::vector<uint8_t> resp_dns;
@@ -763,25 +1154,30 @@ void TunInbound::handle_dns(std::vector<uint8_t>& packet, size_t ip_hdr_len) {
     resp_dns.push_back(0x81); // QR=1, AA=0, TC=0, RD=1
     resp_dns.push_back(0x80); // RA=1, Z=0, RCODE=0
     resp_dns.push_back(0x00); resp_dns.push_back(0x01); // QDCOUNT: 1
-    resp_dns.push_back(0x00); resp_dns.push_back(0x01); // ANCOUNT: 1
+    resp_dns.push_back(0x00); resp_dns.push_back(is_type_a ? 0x01 : 0x00); // ANCOUNT: 1 for A, 0 for others
     resp_dns.push_back(0x00); resp_dns.push_back(0x00); // NSCOUNT: 0
     resp_dns.push_back(0x00); resp_dns.push_back(0x00); // ARCOUNT: 0
 
     // Copy Question section
     resp_dns.insert(resp_dns.end(), dns + 12, dns + q_offset);
 
-    // Answer section
-    std::string fake_ip_str = get_or_create_fakeip(domain);
-    asio::ip::address_v4 fake_addr = asio::ip::make_address_v4(fake_ip_str);
-    auto ip_bytes = fake_addr.to_bytes();
+    if (is_type_a) {
+        // Answer section
+        std::string fake_ip_str = get_or_create_fakeip(domain);
+        asio::ip::address_v4 fake_addr = asio::ip::make_address_v4(fake_ip_str);
+        auto ip_bytes = fake_addr.to_bytes();
 
-    resp_dns.push_back(0xC0); resp_dns.push_back(0x0C); // Name pointer to QNAME (0x0C = 12)
-    resp_dns.push_back(0x00); resp_dns.push_back(0x01); // TYPE A
-    resp_dns.push_back(0x00); resp_dns.push_back(0x01); // CLASS IN
-    resp_dns.push_back(0x00); resp_dns.push_back(0x00);
-    resp_dns.push_back(0x00); resp_dns.push_back(0x01); // TTL: 1 sec
-    resp_dns.push_back(0x00); resp_dns.push_back(0x04); // RDLENGTH: 4
-    resp_dns.insert(resp_dns.end(), ip_bytes.begin(), ip_bytes.end());
+        resp_dns.push_back(0xC0); resp_dns.push_back(0x0C); // Name pointer to QNAME (0x0C = 12)
+        resp_dns.push_back(0x00); resp_dns.push_back(0x01); // TYPE A
+        resp_dns.push_back(0x00); resp_dns.push_back(0x01); // CLASS IN
+        resp_dns.push_back(0x00); resp_dns.push_back(0x00);
+        resp_dns.push_back(0x00); resp_dns.push_back(0x01); // TTL: 1 sec
+        resp_dns.push_back(0x00); resp_dns.push_back(0x04); // RDLENGTH: 4
+        resp_dns.insert(resp_dns.end(), ip_bytes.begin(), ip_bytes.end());
+        VN_DEBUG("[inbound-tun] DNS FakeIP '{}' -> {}", domain, fake_ip_str);
+    } else {
+        VN_DEBUG("[inbound-tun] DNS NODATA for '{}' (qtype={})", domain, qtype);
+    }
 
     // Build UDP + IP Packet
     size_t total_resp_len = 20 + 8 + resp_dns.size();
@@ -827,8 +1223,7 @@ void TunInbound::handle_dns(std::vector<uint8_t>& packet, size_t ip_hdr_len) {
     resp_pkt[26] = static_cast<uint8_t>(udp_csum >> 8);
     resp_pkt[27] = static_cast<uint8_t>(udp_csum & 0xFF);
 
-    VN_DEBUG("[inbound-tun] DNS FakeIP '{}' -> {}", domain, fake_ip_str);
-    write_packet(std::move(resp_pkt));
+    write_packet(resp_pkt.data(), total_resp_len);
 }
 
 void TunInbound::handle_tcp(std::vector<uint8_t>& packet, size_t ip_hdr_len) {

@@ -51,6 +51,7 @@ struct SessionContext {
     asio::ip::tcp::endpoint client_endpoint;
     EndpointAddress original_destination;
     EndpointAddress target_destination;
+    NetworkCommand command{NetworkCommand::TCP};
     
     // Sniffing info
     bool sniff_attempted{false};

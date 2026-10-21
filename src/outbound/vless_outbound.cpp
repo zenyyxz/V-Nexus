@@ -217,7 +217,7 @@ void VlessOutbound::dispatch_tcp(
                     }
 
                     // Build VLESS request header
-                    auto header = build_request_header(*config_.uuid, session->target_destination);
+                    auto header = build_request_header(*config_.uuid, session->target_destination, session->command);
                     if (!payload.empty()) {
                         header.insert(header.end(), payload.begin(), payload.end());
                     }
@@ -309,7 +309,7 @@ void VlessOutbound::dispatch_tls(
                                 session->id, session->target_destination.to_string());
 
                         // Build VLESS request header
-                        auto header = build_request_header(*config_.uuid, session->target_destination);
+                        auto header = build_request_header(*config_.uuid, session->target_destination, session->command);
                         if (!data_bytes.empty()) {
                             header.insert(header.end(), data_bytes.begin(), data_bytes.end());
                         }

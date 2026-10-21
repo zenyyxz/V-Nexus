@@ -35,7 +35,30 @@ struct TunTcpKeyHash {
     }
 };
 
+struct TunUdpKey {
+    uint32_t src_ip{0};
+    uint16_t src_port{0};
+    uint32_t dst_ip{0};
+    uint16_t dst_port{0};
+
+    bool operator==(const TunUdpKey& other) const {
+        return src_ip == other.src_ip && src_port == other.src_port &&
+               dst_ip == other.dst_ip && dst_port == other.dst_port;
+    }
+};
+
+struct TunUdpKeyHash {
+    size_t operator()(const TunUdpKey& k) const noexcept {
+        size_t h1 = std::hash<uint32_t>{}(k.src_ip);
+        size_t h2 = std::hash<uint16_t>{}(k.src_port);
+        size_t h3 = std::hash<uint32_t>{}(k.dst_ip);
+        size_t h4 = std::hash<uint16_t>{}(k.dst_port);
+        return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3);
+    }
+};
+
 class TunTcpConnection;
+class TunUdpConnection;
 
 class TunInbound : public IInbound, public std::enable_shared_from_this<TunInbound> {
 public:
@@ -58,6 +81,8 @@ public:
 
     // Remove finished TCP connection
     void remove_connection(const TunTcpKey& key);
+    // Remove finished UDP connection
+    void remove_udp_connection(const TunUdpKey& key);
 
 private:
     void open_tun_device();
@@ -69,6 +94,8 @@ private:
     void handle_icmp(std::vector<uint8_t>& packet, size_t ip_hdr_len);
     void handle_dns(std::vector<uint8_t>& packet, size_t ip_hdr_len);
     void handle_tcp(std::vector<uint8_t>& packet, size_t ip_hdr_len);
+    void handle_udp(std::vector<uint8_t>& packet, size_t ip_hdr_len);
+    void send_icmp_unreachable(const std::vector<uint8_t>& orig_pkt, size_t orig_ip_len);
 
     // FakeIP helpers
     std::string get_or_create_fakeip(const std::string& domain);
@@ -101,6 +128,9 @@ private:
     // TCP session table
     std::mutex tcp_mutex_;
     std::unordered_map<TunTcpKey, std::shared_ptr<TunTcpConnection>, TunTcpKeyHash> tcp_sessions_;
+    // UDP session table
+    std::mutex udp_mutex_;
+    std::unordered_map<TunUdpKey, std::shared_ptr<TunUdpConnection>, TunUdpKeyHash> udp_sessions_;
     asio::steady_timer cleanup_timer_;
 };
 
